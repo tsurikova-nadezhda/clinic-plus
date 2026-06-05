@@ -1,17 +1,14 @@
 /**
- * Создание руководителя (admin) — единственный способ завести admin (SPEC §6.3).
+ * CLI: создание руководителя (admin).
  *
  * Использование:
  *   ADMIN_EMAIL=boss@clinic.ru ADMIN_PASSWORD='StrongPass1!' bun run seed:admin
  *
  * Работает против БД из DATABASE_URL (прод) или файлового .pglite (dev).
- * In-memory PGlite для этого не подходит — данные не переживут процесс.
- * Идемпотентно: если admin с таким email уже есть — ничего не делает.
+ * In-memory PGlite не подходит — данные не переживут процесс.
  */
-import { eq } from "drizzle-orm";
-import * as bcrypt from "bcryptjs";
-import { db, initDb } from "./index";
-import * as schema from "./schema";
+import { initDb } from "./index";
+import { ensureAdmin } from "./ensureAdmin";
 
 const email = process.env.ADMIN_EMAIL;
 const password = process.env.ADMIN_PASSWORD;
@@ -27,14 +24,6 @@ if (password.length < 8) {
 }
 
 await initDb();
-
-const existing = await db.query.users.findFirst({ where: eq(schema.users.email, email) });
-if (existing) {
-  console.log(`ℹ️  Пользователь ${email} уже существует (role=${existing.role}). Пропускаю.`);
-  process.exit(0);
-}
-
-const hash = await bcrypt.hash(password, 12);
-await db.insert(schema.users).values({ email, passwordHash: hash, name, role: "admin" });
-console.log(`✅ Admin создан: ${email}`);
+const result = await ensureAdmin(email, password, name);
+console.log(result === "created" ? `✅ Admin создан: ${email}` : `ℹ️  ${email} уже существует. Пропускаю.`);
 process.exit(0);

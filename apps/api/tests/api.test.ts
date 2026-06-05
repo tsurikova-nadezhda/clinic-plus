@@ -23,6 +23,7 @@ import { app } from "../src/app";
 import { db, initDb } from "../src/db";
 import * as schema from "../src/db/schema";
 import * as bcrypt from "bcryptjs";
+import { dispatchDueReminders } from "../src/lib/scheduler";
 
 // ─────────────────────────────────────────────
 //  HELPERS
@@ -552,6 +553,45 @@ describe("GET /admin/submissions", () => {
   it("doctor cannot view submissions stats", async () => {
     const r = await req("/admin/submissions", { token: doctorToken });
     expect(r.status).toBe(403);
+  });
+});
+
+// ─────────────────────────────────────────────
+//  PUSH SCHEDULER (cron, §6.2)
+// ─────────────────────────────────────────────
+describe("Push reminder scheduler", () => {
+  it("dispatches a due reminder, but never duplicates it", async () => {
+    // Мероприятие, начинающееся «сейчас», с напоминанием «в момент начала» (0 мин).
+    await db.insert(schema.activities).values({
+      title: "Срочный разбор",
+      startsAt: new Date(),
+      endsAt: new Date(Date.now() + 60 * 60 * 1000),
+      reminders: [0],
+    });
+
+    let sendCalls = 0;
+    const fakeSend = async () => { sendCalls++; };
+
+    const first = await dispatchDueReminders(new Date(), fakeSend);
+    const second = await dispatchDueReminders(new Date(), fakeSend);
+
+    expect(first).toBeGreaterThan(0); // первое напоминание разослано
+    expect(second).toBe(0);          // повторно — ничего (дедуп)
+    expect(sendCalls).toBe(1);       // push отправлен ровно один раз
+  });
+
+  it("does not dispatch reminders for far-future events", async () => {
+    await db.insert(schema.activities).values({
+      title: "Далёкое событие",
+      startsAt: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000), // через 30 дней
+      endsAt: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000 + 3600_000),
+      reminders: [120, 5, 0],
+    });
+    let sendCalls = 0;
+    const before = await dispatchDueReminders(new Date(), async () => { sendCalls++; });
+    // ни одно из напоминаний далёкого события не созрело
+    expect(sendCalls).toBe(0);
+    expect(before).toBe(0);
   });
 });
 

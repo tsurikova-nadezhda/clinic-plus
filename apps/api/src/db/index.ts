@@ -18,11 +18,18 @@ let _db: any;
 let _migrate: () => Promise<void>;
 
 if (DATABASE_URL) {
-  // ── Production: PostgreSQL ──
+  // ── Production: PostgreSQL (Supabase/Neon) ──
   const { drizzle } = await import("drizzle-orm/postgres-js");
   const postgres = (await import("postgres")).default;
   const { migrate } = await import("drizzle-orm/postgres-js/migrator");
-  const client = postgres(DATABASE_URL);
+  const isLocal = /localhost|127\.0\.0\.1/.test(DATABASE_URL);
+  const client = postgres(DATABASE_URL, {
+    // Supabase/Neon требуют SSL; локальный Postgres — нет.
+    ssl: isLocal ? false : "require",
+    // prepare:false — совместимость с пулером Supabase (transaction mode, порт 6543).
+    prepare: false,
+    max: Number(process.env.DB_POOL_MAX ?? 10),
+  });
   _db = drizzle(client, { schema });
   _migrate = () => migrate(_db, { migrationsFolder });
 } else {

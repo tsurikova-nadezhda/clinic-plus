@@ -8,6 +8,13 @@
       "when": 1780665746862,
       "tag": "0000_secret_deadpool",
       "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "7",
+      "when": 1780672990389,
+      "tag": "0001_lonely_mentor",
+      "breakpoints": true
     }
   ]
 }

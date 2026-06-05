@@ -1,0 +1,11 @@
+**/node_modules
+.git
+.gitignore
+**/dist
+**/build
+**/.expo
+**/.pglite
+**/*.log
+# в backend-образ не нужны mobile/admin (и их тяжёлые зависимости)
+apps/mobile
+apps/admin

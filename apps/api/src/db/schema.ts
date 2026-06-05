@@ -166,6 +166,20 @@ export const cases = pgTable("cases", {
   createdAt:   timestamp("created_at").defaultNow(),
 });
 
+// ─────────────────────────────────────────────
+//  SENT REMINDERS  — журнал отправленных push (§6.2)
+//  Идемпотентность cron: одно напоминание (activityId + minutesBefore)
+//  рассылается ровно один раз. Уникальный индекс гарантирует отсутствие дублей.
+// ─────────────────────────────────────────────
+export const sentReminders = pgTable("sent_reminders", {
+  id:            text("id").primaryKey().$defaultFn(() => createId()),
+  activityId:    text("activity_id").notNull().references(() => activities.id, { onDelete: "cascade" }),
+  minutesBefore: integer("minutes_before").notNull(),
+  sentAt:        timestamp("sent_at").defaultNow(),
+}, (t) => ({
+  uniq: uniqueIndex("sent_reminders_activity_min_idx").on(t.activityId, t.minutesBefore),
+}));
+
 export const caseSubmissions = pgTable("case_submissions", {
   id:          text("id").primaryKey().$defaultFn(() => createId()),
   userId:      text("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),

@@ -126,6 +126,9 @@ export const app = new Hono();
 app.use("*", logger());
 app.use("*", cors({ origin: ALLOWED_ORIGINS, credentials: true }));
 
+// Health-check (без авторизации) — для Railway/Render.
+app.get("/health", (c) => c.json({ ok: true, ts: new Date().toISOString() }));
+
 const authMiddleware = jwt({ secret: JWT_SECRET, alg: "HS256" });
 
 // requireAdmin как middleware — выполняется ДО валидации тела (SPEC §6.3):
