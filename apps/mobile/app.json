@@ -1,0 +1,38 @@
+{
+  "expo": {
+    "name": "Клиника ПЛЮС",
+    "slug": "clinic-plus",
+    "scheme": "clinicplus",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "userInterfaceStyle": "light",
+    "backgroundColor": "#faf7f2",
+    "splash": {
+      "backgroundColor": "#523E7A",
+      "resizeMode": "contain"
+    },
+    "assetBundlePatterns": ["**/*"],
+    "ios": {
+      "supportsTablet": true,
+      "bundleIdentifier": "ru.clinicplus.doctor"
+    },
+    "android": {
+      "package": "ru.clinicplus.doctor"
+    },
+    "plugins": [
+      "expo-router",
+      [
+        "expo-notifications",
+        {
+          "color": "#FF5100"
+        }
+      ]
+    ],
+    "experiments": {
+      "typedRoutes": true
+    },
+    "extra": {
+      "apiUrl": "http://localhost:3001"
+    }
+  }
+}
