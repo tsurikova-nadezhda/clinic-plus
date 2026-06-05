@@ -1,6 +1,9 @@
 node_modules/
 dist/
 build/
+# PGlite dev data (файловая БД для локальной разработки)
+.pglite/
+apps/api/.pglite/
 .expo/
 *.log
 .env

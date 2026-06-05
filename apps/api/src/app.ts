@@ -38,6 +38,7 @@ import {
   activityInputSchema,
   newsInputSchema,
   caseSubmitSchema,
+  caseCreateSchema,
   pushTokenSchema,
   balanceWheelSchema,
   reflectionInputSchema,
@@ -391,6 +392,27 @@ app.get("/cases", authMiddleware, async (c) => {
   return c.json({ items });
 });
 
+// Создание кейса админом (§8). HTML-поля экранируются (§6.3).
+app.post("/cases", authMiddleware, requireAdmin, zv("json", caseCreateSchema), async (c) => {
+  const body = c.req.valid("json");
+  const [row] = await db.insert(schema.cases)
+    .values({
+      title: he.escape(body.title),
+      specialty: body.specialty,
+      scenario: he.escape(body.scenario),
+      questions: body.questions.map((q) => ({
+        ...q,
+        text: he.escape(q.text),
+        explanation: he.escape(q.explanation),
+        options: q.options.map((o) => ({ ...o, label: he.escape(o.label) })),
+      })),
+      articleUrl: body.articleUrl,
+      articleText: body.articleText ? he.escape(body.articleText) : undefined,
+    })
+    .returning();
+  return c.json(row, 201);
+});
+
 app.post("/cases/:id/submit", authMiddleware, zv("json", caseSubmitSchema), async (c) => {
   const { sub } = c.get("jwtPayload") as JWTPayload;
   const { id } = c.req.param();
@@ -426,6 +448,56 @@ app.post("/cases/:id/submit", authMiddleware, zv("json", caseSubmitSchema), asyn
     explanations,
     articleUrl: (caseData as any).articleUrl ?? null,
   });
+});
+
+// ─────────────────────────────────────────────
+//  ADMIN — список врачей и статистика (§8)
+// ─────────────────────────────────────────────
+app.get("/admin/doctors", authMiddleware, requireAdmin, async (c) => {
+  const year = new Date().getFullYear();
+  const doctors = await db.query.users.findMany({ where: eq(schema.users.role, "doctor") });
+  const plans = await db.query.plans.findMany({ where: eq(schema.plans.year, year) });
+  const planByUser = new Map(plans.map((p: any) => [p.userId, p.data]));
+
+  const items = doctors.map((d: any) => {
+    const data = planByUser.get(d.id) as any;
+    const tasks = data?.quarters?.flatMap((q: any) => q.tasks) ?? [];
+    const total = tasks.length;
+    const done = tasks.filter((t: any) => t.status === "done").length;
+    return {
+      id: d.id,
+      name: d.name,
+      email: d.email,
+      specialty: d.specialty ?? null,
+      year,
+      hasPlan: !!data,
+      total,
+      done,
+      pct: total ? Math.round((done / total) * 100) : 0,
+    };
+  });
+  return c.json({ items });
+});
+
+app.get("/admin/submissions", authMiddleware, requireAdmin, async (c) => {
+  const [subs, users, cs] = await Promise.all([
+    db.query.caseSubmissions.findMany(),
+    db.query.users.findMany(),
+    db.query.cases.findMany(),
+  ]);
+  const uMap = new Map(users.map((u: any) => [u.id, u]));
+  const cMap = new Map(cs.map((x: any) => [x.id, x]));
+  const items = subs.map((s: any) => ({
+    id: s.id,
+    userId: s.userId,
+    userName: uMap.get(s.userId)?.name ?? "—",
+    caseId: s.caseId,
+    caseTitle: cMap.get(s.caseId)?.title ?? "—",
+    score: s.score,
+    total: (cMap.get(s.caseId)?.questions as any[])?.length ?? 0,
+    submittedAt: s.submittedAt,
+  }));
+  return c.json({ items });
 });
 
 export default { port: process.env.PORT ?? 3001, fetch: app.fetch };

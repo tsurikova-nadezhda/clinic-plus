@@ -490,6 +490,72 @@ describe("POST /cases/:id/submit", () => {
 });
 
 // ─────────────────────────────────────────────
+//  ADMIN (§8) — создание кейсов, список врачей, статистика
+// ─────────────────────────────────────────────
+const newCase = {
+  title: "Лихорадка у грудничка",
+  specialty: "Педиатрия",
+  scenario: "Ребёнок 3 мес с T 38.5...",
+  questions: [
+    {
+      id: "q1", text: "Тактика?",
+      options: [{ key: "A", label: "Госпитализация" }, { key: "B", label: "Наблюдение дома" }],
+      correctAnswer: "A", explanation: "Лихорадка у грудничка — показание к госпитализации.",
+    },
+  ],
+  articleUrl: "https://clinic-plus.example/articles/fever",
+};
+
+describe("POST /cases (admin only)", () => {
+  it("admin can create a clinical case", async () => {
+    const r = await req("/cases", { method: "POST", token: adminToken, body: newCase });
+    expect(r.status).toBe(201);
+    expect(r.body).toHaveProperty("id");
+  });
+
+  it("doctor cannot create a case", async () => {
+    const r = await req("/cases", { method: "POST", token: doctorToken, body: newCase });
+    expect(r.status).toBe(403);
+  });
+
+  it("rejects case without questions", async () => {
+    const r = await req("/cases", {
+      method: "POST", token: adminToken,
+      body: { title: "Пустой", scenario: "сценарий", questions: [] },
+    });
+    expect(r.status).toBe(400);
+  });
+});
+
+describe("GET /admin/doctors", () => {
+  it("admin lists doctors with completion %", async () => {
+    const r = await req("/admin/doctors", { token: adminToken });
+    expect(r.status).toBe(200);
+    expect(Array.isArray(r.body.items)).toBe(true);
+    expect(r.body.items.length).toBeGreaterThan(0);
+    expect(r.body.items[0]).toHaveProperty("pct");
+  });
+
+  it("doctor cannot list doctors (admin guard)", async () => {
+    const r = await req("/admin/doctors", { token: doctorToken });
+    expect(r.status).toBe(403);
+  });
+});
+
+describe("GET /admin/submissions", () => {
+  it("admin views submissions stats", async () => {
+    const r = await req("/admin/submissions", { token: adminToken });
+    expect(r.status).toBe(200);
+    expect(Array.isArray(r.body.items)).toBe(true);
+  });
+
+  it("doctor cannot view submissions stats", async () => {
+    const r = await req("/admin/submissions", { token: doctorToken });
+    expect(r.status).toBe(403);
+  });
+});
+
+// ─────────────────────────────────────────────
 //  SECURITY
 // ─────────────────────────────────────────────
 describe("Security hardening", () => {

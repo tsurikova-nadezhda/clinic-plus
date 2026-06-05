@@ -106,6 +106,27 @@ export const caseQuestionSchema = z.object({
 });
 export type CaseQuestion = z.infer<typeof caseQuestionSchema>;
 
+/** Создание клинического случая админом (SPEC §8). */
+export const caseCreateSchema = z.object({
+  title: z.string().min(3),
+  specialty: z.string().optional(),
+  scenario: z.string().min(5),
+  questions: z
+    .array(
+      z.object({
+        id: z.string().min(1),
+        text: z.string().min(1),
+        options: z.array(z.object({ key: z.string().min(1), label: z.string().min(1) })).min(2),
+        correctAnswer: z.string().min(1),
+        explanation: z.string().default(""),
+      }),
+    )
+    .min(1),
+  articleUrl: z.string().url().optional(),
+  articleText: z.string().optional(),
+});
+export type CaseCreate = z.infer<typeof caseCreateSchema>;
+
 export const caseSubmitSchema = z.object({
   answers: z
     .record(z.string(), z.string())

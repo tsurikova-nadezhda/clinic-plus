@@ -26,11 +26,15 @@ if (DATABASE_URL) {
   _db = drizzle(client, { schema });
   _migrate = () => migrate(_db, { migrationsFolder });
 } else {
-  // ── Dev / tests: PGlite (in-memory) ──
+  // ── Dev / tests: PGlite ──
+  //  Тесты: in-memory (PGLITE_MEMORY=1) — изолированно и быстро.
+  //  Dev: файловый .pglite — данные живут между перезапусками и доступны
+  //  CLI-скриптам (seed:admin) в отдельном процессе.
   const { drizzle } = await import("drizzle-orm/pglite");
   const { PGlite } = await import("@electric-sql/pglite");
   const { migrate } = await import("drizzle-orm/pglite/migrator");
-  const client = new PGlite();
+  const dataDir = process.env.PGLITE_MEMORY ? undefined : join(import.meta.dir, "..", "..", ".pglite");
+  const client = dataDir ? new PGlite(dataDir) : new PGlite();
   _db = drizzle(client, { schema });
   _migrate = () => migrate(_db, { migrationsFolder });
 }
