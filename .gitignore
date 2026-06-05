@@ -1,0 +1,14 @@
+node_modules/
+dist/
+build/
+.expo/
+*.log
+.env
+.env.local
+.DS_Store
+bun.lockb
+# Expo / RN
+apps/mobile/.expo/
+apps/mobile/web-build/
+# Vite
+apps/admin/dist/

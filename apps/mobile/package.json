@@ -1,0 +1,9 @@
+{
+  "name": "@clinic-plus/mobile",
+  "version": "0.0.0",
+  "private": true,
+  "description": "Expo + React Native приложение врача (трек B — будет реализован на шаге 2)",
+  "dependencies": {
+    "@clinic-plus/shared": "workspace:*"
+  }
+}

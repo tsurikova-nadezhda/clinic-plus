@@ -1,0 +1,15 @@
+{
+  "name": "clinic-plus",
+  "private": true,
+  "type": "module",
+  "workspaces": [
+    "apps/*",
+    "packages/*"
+  ],
+  "scripts": {
+    "test": "bun test --cwd apps/api",
+    "dev:api": "bun run --cwd apps/api dev",
+    "db:generate": "bun run --cwd apps/api db:generate",
+    "db:migrate": "bun run --cwd apps/api db:migrate"
+  }
+}
