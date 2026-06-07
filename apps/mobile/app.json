@@ -32,7 +32,7 @@
       "typedRoutes": true
     },
     "extra": {
-      "apiUrl": "http://localhost:3001"
+      "apiUrl": "https://clinic-plus-api-production-f3d7.up.railway.app"
     }
   }
 }
