@@ -72,15 +72,21 @@ export async function registerForPush(): Promise<string | null> {
 
   const projectId =
     Constants.expoConfig?.extra?.eas?.projectId ?? Constants.easConfig?.projectId;
-  const tokenResp = await Notifications.getExpoPushTokenAsync(
-    projectId ? { projectId } : undefined,
-  );
-  const token = tokenResp.data;
 
+  // В Expo Go (без projectId / dev-сборки) getExpoPushTokenAsync может бросить —
+  // глушим, чтобы UI не падал. Push работает в preview/production-сборке.
   try {
-    await api.registerDevice(token);
+    const tokenResp = await Notifications.getExpoPushTokenAsync(
+      projectId ? { projectId } : undefined,
+    );
+    const token = tokenResp.data;
+    try {
+      await api.registerDevice(token);
+    } catch {
+      // токен получим заново при следующем запуске
+    }
+    return token;
   } catch {
-    // токен получим заново при следующем запуске
+    return null; // push недоступен в текущем окружении (напр. Expo Go)
   }
-  return token;
 }

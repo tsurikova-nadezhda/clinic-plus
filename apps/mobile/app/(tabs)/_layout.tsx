@@ -9,9 +9,10 @@ import { registerForPush } from "../../lib/notifications";
 export default function TabsLayout() {
   const { logout } = useAuth();
 
-  // Регистрируем push-токен после входа (SPEC §6.2)
+  // Регистрируем push-токен после входа (SPEC §6.2).
+  // .catch — чтобы Expo Go (без поддержки push) не показывал ошибку.
   useEffect(() => {
-    registerForPush();
+    registerForPush().catch(() => {});
   }, []);
 
   return (
