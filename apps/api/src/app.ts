@@ -121,11 +121,11 @@ const activitySchema = activityInputSchema.refine(
 // ─────────────────────────────────────────────
 //  TYPES
 // ─────────────────────────────────────────────
-type JWTPayload = { sub: string; role: "doctor" | "admin"; exp: number };
+type JWTPayload = { sub: string; role: "doctor" | "admin"; name?: string; exp: number };
 
-function newToken(userId: string, role: "doctor" | "admin") {
+function newToken(userId: string, role: "doctor" | "admin", name = "") {
   return sign(
-    { sub: userId, role, exp: Math.floor(Date.now() / 1000) + JWT_TTL },
+    { sub: userId, role, name, exp: Math.floor(Date.now() / 1000) + JWT_TTL },
     JWT_SECRET,
   );
 }
@@ -174,7 +174,7 @@ app.post("/auth/register", zv("json", registerSchema), async (c) => {
     .values({ email, passwordHash: hash, name: he.escape(name), role: "doctor" })
     .returning();
 
-  const token = await newToken(user.id, user.role);
+  const token = await newToken(user.id, user.role, user.name);
   return c.json({ token, userId: user.id }, 201);
 });
 
@@ -186,7 +186,7 @@ app.post("/auth/login", zv("json", loginSchema), async (c) => {
   if (!user || !(await bcrypt.compare(password, user.passwordHash)))
     return c.json({ error: "Invalid credentials" }, 401);
 
-  const token = await newToken(user.id, user.role);
+  const token = await newToken(user.id, user.role, user.name);
   return c.json({ token });
 });
 
