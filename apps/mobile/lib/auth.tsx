@@ -12,6 +12,7 @@ const TOKEN_KEY = "clinicplus.token";
 export interface SessionUser {
   id: string;
   role: "doctor" | "admin";
+  name: string;
 }
 
 interface AuthState {
@@ -31,7 +32,10 @@ function decodeJwt(token: string): SessionUser | null {
     const payload = token.split(".")[1];
     const normalized = payload.replace(/-/g, "+").replace(/_/g, "/");
     const json = JSON.parse(globalThis.atob(normalized));
-    return { id: json.sub, role: json.role };
+    let name: string = json.name ?? "";
+    // JWT-payload в base64 — кириллица приходит как UTF-8-байты; чиним кодировку.
+    try { name = decodeURIComponent(escape(name)); } catch {}
+    return { id: json.sub, role: json.role, name };
   } catch {
     return null;
   }

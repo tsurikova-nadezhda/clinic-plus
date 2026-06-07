@@ -1,112 +1,107 @@
-import { useEffect, useState } from "react";
-import { View, Text, StyleSheet, Switch } from "react-native";
+import { View, Text, StyleSheet, ScrollView } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
-import { Screen, Card, Loading, Empty, Badge, SectionTitle } from "../../components/ui";
+import { Screen, Loading, Empty } from "../../components/ui";
 import { api, type Activity } from "../../lib/api";
 import { useAsync } from "../../lib/hooks";
-import { formatDateTime } from "../../lib/format";
-import {
-  loadReminderPrefs, saveReminderPrefs, defaultReminderPrefs, type ReminderPrefs,
-} from "../../lib/notifications";
-import { colors, space, typography, radius } from "../../lib/theme";
+import { formatTime } from "../../lib/format";
+import { colors, radius, space } from "../../lib/theme";
+
+const WD = ["Вс", "Пн", "Вт", "Ср", "Чт", "Пт", "Сб"];
+const MON = ["ЯНВ", "ФЕВ", "МАР", "АПР", "МАЯ", "ИЮН", "ИЮЛ", "АВГ", "СЕН", "ОКТ", "НОЯ", "ДЕК"];
+
+function weekStrip(): Date[] {
+  const now = new Date();
+  const dow = (now.getDay() + 6) % 7; // 0 = Пн
+  const monday = new Date(now); monday.setDate(now.getDate() - dow); monday.setHours(0, 0, 0, 0);
+  return Array.from({ length: 7 }, (_, i) => { const d = new Date(monday); d.setDate(monday.getDate() + i); return d; });
+}
+function reminderText(min: number) { return min === 0 ? "в начале" : min < 60 ? `за ${min} мин` : `за ${Math.round(min / 60)} ч`; }
 
 export default function ActivitiesScreen() {
   const { data, loading, refreshing, refresh } = useAsync(() => api.activities());
-  const [prefs, setPrefs] = useState<ReminderPrefs>(defaultReminderPrefs);
-
-  useEffect(() => { loadReminderPrefs().then(setPrefs); }, []);
-  function toggle(key: keyof ReminderPrefs) {
-    const next = { ...prefs, [key]: !prefs[key] };
-    setPrefs(next);
-    saveReminderPrefs(next);
-  }
-
   if (loading) return <Loading />;
+
   const items = (data?.items ?? []).sort((a, b) => +new Date(a.startsAt) - +new Date(b.startsAt));
   const now = Date.now();
   const upcoming = items.filter((a) => +new Date(a.startsAt) >= now);
   const past = items.filter((a) => +new Date(a.startsAt) < now);
+  const today = new Date().toDateString();
 
   return (
     <Screen onRefresh={refresh} refreshing={refreshing}>
-      {/* Настройки напоминаний (§6.2) */}
-      <Card>
-        <SectionTitle>Напоминания</SectionTitle>
-        <Text style={typography.muted}>Какие push-уведомления о мероприятиях получать:</Text>
-        <ReminderRow label="За 2 часа" on={prefs.twoHours} onToggle={() => toggle("twoHours")} />
-        <ReminderRow label="За 5 минут" on={prefs.fiveMin} onToggle={() => toggle("fiveMin")} />
-        <ReminderRow label="В момент начала" on={prefs.atStart} onToggle={() => toggle("atStart")} />
-      </Card>
+      <Text style={styles.h1}>Активности</Text>
+      <Text style={styles.sub}>Анонсы и календарь мероприятий</Text>
 
-      <SectionTitle style={{ marginTop: space.sm }}>Предстоящие</SectionTitle>
-      {upcoming.length === 0 ? (
-        <Empty text="Нет запланированных мероприятий." />
-      ) : (
-        upcoming.map((a) => <ActivityCard key={a.id} a={a} upcoming />)
-      )}
+      <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.strip}>
+        {weekStrip().map((d, i) => {
+          const isToday = d.toDateString() === today;
+          return (
+            <View key={i} style={[styles.day, isToday && styles.dayActive]}>
+              <Text style={[styles.dayWd, isToday && { color: "rgba(255,255,255,0.7)" }]}>{WD[d.getDay()]}</Text>
+              <Text style={[styles.dayNum, isToday && { color: colors.white }]}>{d.getDate()}</Text>
+              {isToday && <View style={styles.dayDot} />}
+            </View>
+          );
+        })}
+      </ScrollView>
+
+      <Text style={styles.section}>Предстоящие</Text>
+      {upcoming.length === 0 ? <Empty text="Нет запланированных мероприятий." /> : upcoming.map((e) => <EventCard key={e.id} e={e} />)}
 
       {past.length > 0 && (
         <>
-          <SectionTitle style={{ marginTop: space.md }}>Прошедшие</SectionTitle>
-          {past.map((a) => <ActivityCard key={a.id} a={a} />)}
+          <Text style={[styles.section, { marginTop: space.md }]}>Прошедшие</Text>
+          {past.map((e) => <EventCard key={e.id} e={e} dim />)}
         </>
       )}
     </Screen>
   );
 }
 
-function ReminderRow({ label, on, onToggle }: { label: string; on: boolean; onToggle: () => void }) {
+function EventCard({ e, dim }: { e: Activity; dim?: boolean }) {
+  const d = new Date(e.startsAt);
+  const soonMin = Math.round((+d - Date.now()) / 60000);
+  const soon = soonMin >= 0 && soonMin <= 60;
   return (
-    <View style={styles.reminderRow}>
-      <Text style={typography.body}>{label}</Text>
-      <Switch
-        value={on}
-        onValueChange={onToggle}
-        trackColor={{ true: colors.orange, false: "#d9d2e3" }}
-        thumbColor={colors.white}
-      />
+    <View style={[styles.card, dim && { opacity: 0.65 }]}>
+      <View style={styles.dateBadge}>
+        <Text style={styles.dateDay}>{String(d.getDate()).padStart(2, "0")}</Text>
+        <Text style={styles.dateMon}>{MON[d.getMonth()]}</Text>
+      </View>
+      <View style={{ flex: 1 }}>
+        {soon && <View style={styles.soon}><Text style={styles.soonText}>через {soonMin} мин</Text></View>}
+        <Text style={styles.cardTitle}>{e.title}</Text>
+        <View style={styles.metaRow}>
+          <View style={styles.metaItem}><Ionicons name="time-outline" size={12} color={colors.muted} /><Text style={styles.metaText}>{formatTime(e.startsAt)}–{formatTime(e.endsAt)}</Text></View>
+          {e.location ? <View style={styles.metaItem}><Ionicons name="location-outline" size={12} color={colors.muted} /><Text style={styles.metaText}>{e.location}</Text></View> : null}
+        </View>
+        {e.description ? <Text style={styles.desc}>{e.description}</Text> : null}
+        {e.reminders?.length ? <Text style={styles.reminders}>🔔 {e.reminders.map(reminderText).join(" · ")}</Text> : null}
+      </View>
     </View>
   );
 }
 
-function ActivityCard({ a, upcoming }: { a: Activity; upcoming?: boolean }) {
-  return (
-    <Card style={!upcoming ? { opacity: 0.7 } : undefined}>
-      <View style={styles.rowBetween}>
-        <Text style={[typography.h3, { flex: 1 }]} numberOfLines={2}>{a.title}</Text>
-        {upcoming ? <Badge text="скоро" color={colors.green} /> : null}
-      </View>
-      <View style={styles.metaRow}>
-        <Ionicons name="time-outline" size={15} color={colors.muted} />
-        <Text style={typography.muted}>{formatDateTime(a.startsAt)}</Text>
-      </View>
-      {a.location ? (
-        <View style={styles.metaRow}>
-          <Ionicons name="location-outline" size={15} color={colors.muted} />
-          <Text style={typography.muted}>{a.location}</Text>
-        </View>
-      ) : null}
-      {a.description ? <Text style={typography.body}>{a.description}</Text> : null}
-      {a.reminders?.length ? (
-        <Text style={[typography.muted, { color: colors.plum }]}>
-          🔔 напоминания: {a.reminders.map(labelMin).join(", ")}
-        </Text>
-      ) : null}
-    </Card>
-  );
-}
-
-function labelMin(m: number): string {
-  if (m === 0) return "в начале";
-  if (m < 60) return `за ${m} мин`;
-  return `за ${Math.round(m / 60)} ч`;
-}
-
 const styles = StyleSheet.create({
-  rowBetween: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", gap: space.sm },
-  metaRow: { flexDirection: "row", alignItems: "center", gap: space.xs },
-  reminderRow: {
-    flexDirection: "row", justifyContent: "space-between", alignItems: "center",
-    paddingVertical: space.xs, borderTopWidth: 1, borderTopColor: "#f0ebf5",
-  },
+  h1: { fontSize: 24, fontWeight: "800", color: colors.plumDeep },
+  sub: { fontSize: 14, color: colors.muted, marginBottom: space.md },
+  strip: { gap: space.sm, paddingVertical: 2 },
+  day: { width: 52, borderRadius: radius.md, paddingVertical: space.sm, alignItems: "center", backgroundColor: colors.white, borderWidth: 1, borderColor: colors.line },
+  dayActive: { backgroundColor: colors.plum, borderColor: colors.plum },
+  dayWd: { fontSize: 10, color: colors.muted },
+  dayNum: { fontSize: 16, fontWeight: "800", color: colors.plumDeep },
+  dayDot: { width: 6, height: 6, borderRadius: 3, backgroundColor: colors.yellow, marginTop: 3 },
+  section: { fontSize: 11, fontWeight: "700", color: colors.orange, textTransform: "uppercase", letterSpacing: 1, marginTop: space.md, marginBottom: space.sm },
+  card: { flexDirection: "row", gap: space.md, backgroundColor: colors.white, borderRadius: radius.xl, padding: space.lg, borderWidth: 1, borderColor: colors.line, marginBottom: space.sm },
+  dateBadge: { width: 56, height: 56, borderRadius: radius.md, backgroundColor: "rgba(255,81,0,0.08)", alignItems: "center", justifyContent: "center" },
+  dateDay: { fontSize: 18, fontWeight: "800", color: colors.orange, lineHeight: 20 },
+  dateMon: { fontSize: 10, color: colors.orange },
+  soon: { alignSelf: "flex-start", backgroundColor: colors.orange, borderRadius: radius.pill, paddingHorizontal: 8, paddingVertical: 2, marginBottom: 4 },
+  soonText: { color: colors.white, fontSize: 10, fontWeight: "700" },
+  cardTitle: { fontSize: 15, fontWeight: "700", color: colors.plumDeep, marginBottom: 4 },
+  metaRow: { flexDirection: "row", gap: space.md, flexWrap: "wrap" },
+  metaItem: { flexDirection: "row", alignItems: "center", gap: 4 },
+  metaText: { fontSize: 12, color: colors.muted },
+  desc: { fontSize: 13, color: colors.ink, marginTop: 6 },
+  reminders: { fontSize: 11, color: colors.plum, marginTop: 6 },
 });

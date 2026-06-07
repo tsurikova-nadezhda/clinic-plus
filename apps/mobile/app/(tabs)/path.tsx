@@ -1,304 +1,355 @@
 import { useState } from "react";
-import { View, Text, StyleSheet, Pressable } from "react-native";
+import { View, Text, StyleSheet, Pressable, TextInput } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
-import {
-  Screen, Card, Button, Field, ProgressBar, Loading, Empty, Badge, SectionTitle,
-} from "../../components/ui";
+import { LinearGradient } from "expo-linear-gradient";
+import { SafeAreaView } from "react-native-safe-area-context";
+import { ScrollView, RefreshControl } from "react-native";
+import { Progress, Loading, Empty, Field, Button } from "../../components/ui";
+import { BalanceWheel } from "../../components/BalanceWheel";
 import { api, type Win } from "../../lib/api";
-import type { Plan, Task, ArchiveYear } from "@clinic-plus/shared";
+import type { Plan, Task, Quarter, ArchiveYear } from "@clinic-plus/shared";
+import { useAuth } from "../../lib/auth";
 import { useAsync } from "../../lib/hooks";
 import { planProgress } from "../../lib/format";
-import { colors, space, typography, radius, warmCopy } from "../../lib/theme";
+import { colors, gradients, diag, radius, space, tint, warmCopy } from "../../lib/theme";
 
-type Segment = "plan" | "diary" | "archive";
-const SEGMENTS: { key: Segment; label: string }[] = [
-  { key: "plan", label: "План года" },
-  { key: "diary", label: "Дневник успеха" },
-  { key: "archive", label: "Архив" },
-];
+type Seg = "plan" | "diary" | "archive";
+const YEAR = new Date().getFullYear();
 
 export default function PathScreen() {
-  const [seg, setSeg] = useState<Segment>("plan");
+  const { user, logout } = useAuth();
+  const [seg, setSeg] = useState<Seg>("plan");
+
   return (
-    <Screen scroll={false}>
-      <View style={styles.segmentWrap}>
-        {SEGMENTS.map((s) => {
-          const active = s.key === seg;
-          return (
-            <Pressable key={s.key} onPress={() => setSeg(s.key)} style={[styles.segment, active && styles.segmentActive]}>
-              <Text style={[styles.segmentText, active && styles.segmentTextActive]}>{s.label}</Text>
+    <View style={{ flex: 1, backgroundColor: colors.paper }}>
+      <SafeAreaView edges={["top"]} style={{ backgroundColor: colors.plum }} />
+      <LinearGradient colors={gradients.plum} start={diag.start} end={diag.end} style={styles.header}>
+        <View style={styles.headerTop}>
+          <Text style={styles.headerKicker}>{user?.name || "Врач"} · {user?.role === "admin" ? "руководитель" : "педиатр"}</Text>
+          <Pressable onPress={logout} hitSlop={10}><Ionicons name="log-out-outline" size={20} color={colors.white} /></Pressable>
+        </View>
+        <Text style={styles.headerTitle}>Мой путь развития</Text>
+        <View style={styles.segment}>
+          {([["plan", "План года"], ["diary", "Успехи"], ["archive", "Архив"]] as const).map(([k, l]) => (
+            <Pressable key={k} onPress={() => setSeg(k)} style={[styles.segBtn, seg === k && styles.segBtnActive]}>
+              <Text style={[styles.segText, { color: seg === k ? colors.plum : colors.white }]}>{l}</Text>
             </Pressable>
-          );
-        })}
-      </View>
+          ))}
+        </View>
+      </LinearGradient>
       {seg === "plan" && <PlanTab />}
       {seg === "diary" && <DiaryTab />}
       {seg === "archive" && <ArchiveTab />}
-    </Screen>
-  );
-}
-
-// ─────────────────────────────────────────────
-//  ВКЛАДКА: План года
-// ─────────────────────────────────────────────
-const STATUS_NEXT: Record<Task["status"], Task["status"]> = {
-  pending: "in_progress",
-  in_progress: "done",
-  done: "pending",
-};
-const STATUS_META: Record<Task["status"], { icon: any; color: string; label: string }> = {
-  pending: { icon: "ellipse-outline", color: colors.muted, label: "не начато" },
-  in_progress: { icon: "time", color: colors.yellow, label: "в процессе" },
-  done: { icon: "checkmark-circle", color: colors.green, label: "готово" },
-};
-const BALANCE_SPHERES = ["Здоровье", "Карьера", "Финансы", "Отношения", "Развитие", "Отдых", "Окружение", "Смысл"];
-
-function PlanTab() {
-  const year = new Date().getFullYear();
-  const { data: plan, loading, refreshing, refresh, setData } = useAsync<Plan>(() => api.planMe());
-  const [balance, setBalance] = useState<number[]>(Array(8).fill(5));
-  const [reflection, setReflection] = useState("");
-  const [savingB, setSavingB] = useState(false);
-  const [savingR, setSavingR] = useState(false);
-  const [savedB, setSavedB] = useState(false);
-  const [savedR, setSavedR] = useState(false);
-
-  if (loading || !plan) return <Loading />;
-  const prog = planProgress(plan);
-  const hasPlan = (plan.quarters?.length ?? 0) > 0;
-
-  async function cycle(task: Task) {
-    const next = STATUS_NEXT[task.status];
-    // оптимистичное обновление
-    setData({
-      ...plan!,
-      quarters: plan!.quarters.map((q) => ({
-        ...q,
-        tasks: q.tasks.map((t) => (t.id === task.id ? { ...t, status: next } : t)),
-      })),
-    });
-    try { await api.patchTask(task.id, next); } catch { refresh(); }
-  }
-
-  async function saveBalance() {
-    setSavingB(true);
-    try { await api.putBalance(year, "start", balance); setSavedB(true); } finally { setSavingB(false); }
-  }
-  async function saveReflection() {
-    if (!reflection.trim()) return;
-    setSavingR(true);
-    try { await api.putReflection(year, "year", reflection.trim()); setSavedR(true); } finally { setSavingR(false); }
-  }
-
-  return (
-    <Screen onRefresh={refresh} refreshing={refreshing}>
-      <Card>
-        <Text style={typography.h2}>{year} — мой план</Text>
-        <Text style={typography.body}>{plan.mission || "Миссия пока не задана руководителем."}</Text>
-        <ProgressBar pct={prog.pct} />
-        <Text style={typography.muted}>{prog.done} из {prog.total} задач · {prog.pct}%</Text>
-      </Card>
-
-      {!hasPlan ? (
-        <Empty text="Руководитель ещё не загрузил ваш план на этот год. Он появится здесь." />
-      ) : (
-        plan.quarters.map((q) => (
-          <Card key={q.q}>
-            <View style={styles.rowBetween}>
-              <Text style={typography.h3}>{q.q} · {q.title}</Text>
-              <Badge text={q.focus} color={colors.plum} />
-            </View>
-            {q.tasks.map((t) => {
-              const m = STATUS_META[t.status];
-              return (
-                <Pressable key={t.id} onPress={() => cycle(t)} style={styles.taskRow}>
-                  <Ionicons name={m.icon} size={22} color={m.color} />
-                  <View style={{ flex: 1 }}>
-                    <Text style={[typography.body, t.status === "done" && styles.taskDone]}>{t.text}</Text>
-                    <Text style={[typography.muted, { color: m.color }]}>{typeLabel(t.type)} · {m.label}</Text>
-                  </View>
-                </Pressable>
-              );
-            })}
-          </Card>
-        ))
-      )}
-
-      {/* Колесо баланса (§5) */}
-      <Card>
-        <SectionTitle>Колесо баланса · начало года</SectionTitle>
-        <Text style={typography.muted}>Оцените каждую сферу от 0 до 10.</Text>
-        {BALANCE_SPHERES.map((label, i) => (
-          <Stepper
-            key={label} label={label} value={balance[i]}
-            onChange={(v) => { const next = [...balance]; next[i] = v; setBalance(next); setSavedB(false); }}
-          />
-        ))}
-        <Button title={savedB ? "Сохранено ✓" : "Сохранить колесо"} onPress={saveBalance} loading={savingB} variant="secondary" />
-      </Card>
-
-      {/* Рефлексия года (§5) */}
-      <Card>
-        <SectionTitle>Рефлексия года</SectionTitle>
-        <Field value={reflection} onChangeText={(t) => { setReflection(t); setSavedR(false); }} placeholder="Главный инсайт года…" multiline />
-        <Button title={savedR ? "Сохранено ✓" : "Сохранить рефлексию"} onPress={saveReflection} loading={savingR} variant="secondary" />
-      </Card>
-    </Screen>
-  );
-}
-
-function Stepper({ label, value, onChange }: { label: string; value: number; onChange: (v: number) => void }) {
-  return (
-    <View style={styles.stepperRow}>
-      <Text style={[typography.body, { flex: 1 }]}>{label}</Text>
-      <Pressable onPress={() => onChange(Math.max(0, value - 1))} style={styles.stepBtn}>
-        <Ionicons name="remove" size={18} color={colors.plum} />
-      </Pressable>
-      <Text style={styles.stepValue}>{value}</Text>
-      <Pressable onPress={() => onChange(Math.min(10, value + 1))} style={styles.stepBtn}>
-        <Ionicons name="add" size={18} color={colors.plum} />
-      </Pressable>
     </View>
   );
 }
 
-function typeLabel(t: Task["type"]): string {
-  return { course: "курс", book: "книга", media: "медиа", practice: "практика" }[t];
+function Body({ children, onRefresh, refreshing }: { children: React.ReactNode; onRefresh?: () => void; refreshing?: boolean }) {
+  return (
+    <ScrollView contentContainerStyle={styles.body} showsVerticalScrollIndicator={false}
+      refreshControl={onRefresh ? <RefreshControl refreshing={!!refreshing} onRefresh={onRefresh} tintColor={colors.plum} /> : undefined}>
+      {children}
+    </ScrollView>
+  );
 }
 
-// ─────────────────────────────────────────────
-//  ВКЛАДКА: Дневник успеха
-// ─────────────────────────────────────────────
-const WIN_CATEGORIES = ["Профессия", "Блог", "Личное", "Обучение"];
+// ───────── ПЛАН ГОДА ─────────
+const STATUS_NEXT: Record<Task["status"], Task["status"]> = { pending: "in_progress", in_progress: "done", done: "pending" };
+const TYPE_LABEL: Record<Task["type"], string> = { course: "Курс", book: "Книга", media: "Медиа", practice: "Практика" };
+const SPHERES = ["Карьера", "Здоровье", "Семья", "Друзья", "Рост", "Финансы", "Отдых", "Дух"];
+
+function StatusIcon({ s }: { s: Task["status"] }) {
+  if (s === "done") return <Ionicons name="checkmark-circle" size={22} color={colors.orange} />;
+  if (s === "in_progress") return <Ionicons name="ellipse-outline" size={22} color={colors.plum} />;
+  return <Ionicons name="ellipse-outline" size={22} color={colors.muted} />;
+}
+
+function PlanTab() {
+  const { data: plan, loading, refreshing, refresh, setData } = useAsync<Plan>(() => api.planMe());
+  const [openQ, setOpenQ] = useState(0);
+  const [start, setStart] = useState([7, 6, 7, 8, 5, 5, 7, 8]);
+  const [end, setEnd] = useState([8, 8, 8, 9, 7, 7, 8, 9]);
+  const [editWheel, setEditWheel] = useState(false);
+
+  if (loading || !plan) return <Body><Loading /></Body>;
+  const prog = planProgress(plan);
+  const quarters = plan.quarters ?? [];
+
+  async function cycle(t: Task) {
+    const next = STATUS_NEXT[t.status];
+    setData({ ...plan!, quarters: plan!.quarters.map((q) => ({ ...q, tasks: q.tasks.map((x) => x.id === t.id ? { ...x, status: next } : x) })) });
+    try { await api.patchTask(t.id, next); } catch { refresh(); }
+  }
+  const saveReflection = (scope: Quarter["q"] | "year", text: string) => { if (text.trim()) api.putReflection(YEAR, scope, text.trim()).catch(() => {}); };
+  const saveWheel = (phase: "start" | "end", vals: number[]) => api.putBalance(YEAR, phase, vals).catch(() => {});
+
+  return (
+    <Body onRefresh={refresh} refreshing={refreshing}>
+      {/* прогресс */}
+      <View style={[styles.card, styles.rowCenter]}>
+        <View style={{ flex: 1 }}><Progress pct={prog.pct} /></View>
+        <Text style={styles.pct}>{prog.pct}%</Text>
+      </View>
+
+      {/* миссия */}
+      <View style={styles.card}>
+        <Text style={styles.cap}>Миссия года</Text>
+        <Text style={styles.body15}>{plan.mission || "Миссия пока не задана руководителем."}</Text>
+      </View>
+
+      {/* колесо баланса */}
+      <View style={styles.card}>
+        <View style={styles.rowBetween}>
+          <Text style={styles.cap}>Колесо баланса</Text>
+          <Pressable onPress={() => setEditWheel((v) => !v)}><Text style={styles.link}>{editWheel ? "готово" : "изменить"}</Text></Pressable>
+        </View>
+        <Text style={styles.muted12}>Сравнение: начало и конец года</Text>
+        <BalanceWheel start={start} end={end} labels={SPHERES} />
+        {editWheel && (
+          <View style={{ marginTop: space.sm, gap: space.sm }}>
+            {SPHERES.map((label, i) => (
+              <View key={label} style={styles.wheelRow}>
+                <Text style={styles.wheelLabel}>{label}</Text>
+                <DualStepper
+                  s={start[i]} e={end[i]}
+                  onS={(v) => { const n = [...start]; n[i] = v; setStart(n); saveWheel("start", n); }}
+                  onE={(v) => { const n = [...end]; n[i] = v; setEnd(n); saveWheel("end", n); }}
+                />
+              </View>
+            ))}
+          </View>
+        )}
+      </View>
+
+      {/* Правило 50% */}
+      <View style={styles.rule}>
+        <Ionicons name="ribbon" size={28} color={colors.orange} />
+        <Text style={styles.ruleText}><Text style={{ fontWeight: "800" }}>Правило 50%: </Text>выполнить половину плана — это уже грандиозный успех.</Text>
+      </View>
+
+      {/* кварталы */}
+      <Text style={styles.section}>Четыре шага года</Text>
+      {quarters.length === 0 ? <Empty text="Руководитель ещё не загрузил ваш план на этот год." /> : quarters.map((Q, qi) => {
+        const open = openQ === qi;
+        return (
+          <View key={qi} style={styles.qCard}>
+            <Pressable onPress={() => setOpenQ(open ? -1 : qi)} style={styles.qHead}>
+              <LinearGradient colors={gradients.progress} start={diag.start} end={diag.end} style={styles.qBadge}><Text style={styles.qBadgeText}>{Q.q}</Text></LinearGradient>
+              <View style={{ flex: 1 }}>
+                <Text style={styles.qTitle}>{Q.title}</Text>
+                <Text style={styles.qFocus}>{Q.focus}</Text>
+              </View>
+              <Ionicons name={open ? "chevron-down" : "chevron-forward"} size={18} color={open ? colors.plum : colors.muted} />
+            </Pressable>
+            {open && (
+              <View style={{ paddingHorizontal: space.lg, paddingBottom: space.lg }}>
+                {Q.tasks.length > 0 ? Q.tasks.map((t) => (
+                  <Pressable key={t.id} onPress={() => cycle(t)} style={styles.taskRow}>
+                    <StatusIcon s={t.status} />
+                    <View style={{ flex: 1 }}>
+                      <View style={styles.tagWrap}><Text style={styles.tag}>{TYPE_LABEL[t.type]}</Text></View>
+                      <Text style={[styles.taskText, t.status === "done" && styles.taskDone]}>{t.text}</Text>
+                    </View>
+                  </Pressable>
+                )) : <Text style={styles.taskEmpty}>Задачи появятся ближе к кварталу</Text>}
+                <View style={styles.insight}>
+                  <Text style={styles.insightCap}>✏️ Инсайт квартала</Text>
+                  <TextInput style={styles.insightInput} multiline placeholder="Что сработало? Какие 2 фишки внедрила в практику?"
+                    placeholderTextColor={colors.muted} onEndEditing={(e) => saveReflection(Q.q, e.nativeEvent.text)} />
+                </View>
+              </View>
+            )}
+          </View>
+        );
+      })}
+
+      {/* итоги года */}
+      <View style={[styles.card, { backgroundColor: tint.yellow12 }]}>
+        <Text style={[styles.cap, { color: colors.plumDeep }]}>✨ Итоги года</Text>
+        <TextInput style={[styles.insightInput, { minHeight: 90 }]} multiline
+          placeholder={"Главный прорыв года:\nЧему научилась в отношениях с собой:\nКак изменилось ощущение внутренней свободы:"}
+          placeholderTextColor={colors.muted} onEndEditing={(e) => saveReflection("year", e.nativeEvent.text)} />
+      </View>
+      <Text style={styles.foot}>Записи сохраняются навсегда и не теряются при обновлении плана</Text>
+    </Body>
+  );
+}
+
+function DualStepper({ s, e, onS, onE }: { s: number; e: number; onS: (v: number) => void; onE: (v: number) => void }) {
+  const btn = (label: string, val: number, set: (v: number) => void, color: string) => (
+    <View style={styles.dual}>
+      <Pressable onPress={() => set(Math.max(0, val - 1))} style={styles.stepBtn}><Ionicons name="remove" size={14} color={color} /></Pressable>
+      <Text style={[styles.stepVal, { color }]}>{val}</Text>
+      <Pressable onPress={() => set(Math.min(10, val + 1))} style={styles.stepBtn}><Ionicons name="add" size={14} color={color} /></Pressable>
+    </View>
+  );
+  return (
+    <View style={{ flexDirection: "row", gap: space.sm }}>
+      {btn("н", s, onS, colors.plum)}
+      {btn("к", e, onE, colors.orange)}
+    </View>
+  );
+}
+
+// ───────── УСПЕХИ ─────────
+const CAT_COLOR: Record<string, string> = { "Профессия": colors.plum, "Блог": colors.orange, "Личное": colors.green, "Обучение": colors.blue };
+const CATS = ["Профессия", "Блог", "Личное", "Обучение"];
 
 function DiaryTab() {
   const { data, loading, refreshing, refresh, setData } = useAsync<{ items: Win[] }>(() => api.wins());
+  const [adding, setAdding] = useState(false);
   const [text, setText] = useState("");
-  const [cat, setCat] = useState(WIN_CATEGORIES[0]);
+  const [cat, setCat] = useState(CATS[0]);
   const [busy, setBusy] = useState(false);
+
+  if (loading) return <Body><Loading /></Body>;
+  const wins = data?.items ?? [];
 
   async function add() {
     if (!text.trim()) return;
     setBusy(true);
-    try {
-      const win = await api.addWin(text.trim(), cat);
-      setData({ items: [win, ...(data?.items ?? [])] });
-      setText("");
-    } finally { setBusy(false); }
+    try { const w = await api.addWin(text.trim(), cat); setData({ items: [w, ...wins] }); setText(""); setAdding(false); }
+    finally { setBusy(false); }
   }
 
-  if (loading) return <Loading />;
-  const items = data?.items ?? [];
-
   return (
-    <Screen onRefresh={refresh} refreshing={refreshing}>
-      <Card>
-        <SectionTitle>Добавить победу</SectionTitle>
-        <Field value={text} onChangeText={setText} placeholder="Что получилось? Даже маленькое — важно." multiline />
-        <View style={styles.catRow}>
-          {WIN_CATEGORIES.map((c) => (
-            <Pressable key={c} onPress={() => setCat(c)} style={[styles.catChip, c === cat && styles.catChipActive]}>
-              <Text style={[styles.catChipText, c === cat && styles.catChipTextActive]}>{c}</Text>
-            </Pressable>
-          ))}
-        </View>
-        <Button title="Записать" onPress={add} loading={busy} disabled={!text.trim()} />
-      </Card>
+    <Body onRefresh={refresh} refreshing={refreshing}>
+      <LinearGradient colors={gradients.orange} start={diag.start} end={diag.end} style={styles.trophy}>
+        <Ionicons name="trophy" size={32} color={colors.white} />
+        <Text style={styles.trophyNum}>{wins.length} {plural(wins.length, "успех", "успеха", "успехов")} записано</Text>
+        <Text style={styles.trophySub}>Каждая победа важна — большая и маленькая</Text>
+      </LinearGradient>
 
-      {items.length === 0 ? (
-        <Empty text={warmCopy.emptyDiary} />
+      {!adding ? (
+        <Pressable onPress={() => setAdding(true)} style={styles.addBtn}><Ionicons name="add" size={18} color={colors.white} /><Text style={styles.addBtnText}>Записать успех</Text></Pressable>
       ) : (
-        items.map((w) => (
-          <Card key={w.id}>
-            <Badge text={w.category} color={colors.orange} />
-            <Text style={typography.body}>{w.text}</Text>
-          </Card>
-        ))
+        <View style={styles.card}>
+          <Field value={text} onChangeText={setText} placeholder="Что хорошего получилось? Даже маленькое — важно." multiline />
+          <View style={styles.catRow}>
+            {CATS.map((c) => (
+              <Pressable key={c} onPress={() => setCat(c)} style={[styles.catChip, c === cat && { backgroundColor: colors.plum }]}>
+                <Text style={[styles.catChipText, c === cat && { color: colors.white }]}>{c}</Text>
+              </Pressable>
+            ))}
+          </View>
+          <View style={{ flexDirection: "row", gap: space.sm }}>
+            <Button title="Сохранить" onPress={add} loading={busy} disabled={!text.trim()} style={{ flex: 1 }} />
+            <Button title="Отмена" variant="ghost" onPress={() => { setAdding(false); setText(""); }} />
+          </View>
+        </View>
       )}
-    </Screen>
+
+      {wins.length === 0 ? <Empty text={warmCopy.emptyDiary} /> : wins.map((w) => (
+        <View key={w.id} style={styles.winCard}>
+          <View style={[styles.winBar, { backgroundColor: CAT_COLOR[w.category] ?? colors.plum }]} />
+          <View style={{ flex: 1 }}>
+            <View style={styles.rowBetween}>
+              <View style={[styles.catBadge, { backgroundColor: (CAT_COLOR[w.category] ?? colors.plum) + "22" }]}>
+                <Text style={{ color: CAT_COLOR[w.category] ?? colors.plum, fontSize: 10, fontWeight: "700" }}>{w.category}</Text>
+              </View>
+            </View>
+            <Text style={styles.body15}>{w.text}</Text>
+          </View>
+        </View>
+      ))}
+    </Body>
   );
 }
 
-// ─────────────────────────────────────────────
-//  ВКЛАДКА: Архив (бизнес-правило §6.1 — позитивная подача)
-// ─────────────────────────────────────────────
+// ───────── АРХИВ ─────────
 function ArchiveTab() {
   const { data, loading, refreshing, refresh } = useAsync<{ years: ArchiveYear[] }>(() => api.archive());
-  if (loading) return <Loading />;
+  if (loading) return <Body><Loading /></Body>;
   const years = (data?.years ?? []).sort((a, b) => b.year - a.year);
 
   return (
-    <Screen onRefresh={refresh} refreshing={refreshing}>
-      {years.length === 0 ? (
-        <Empty text="Здесь будет история ваших лет в профессии." />
-      ) : (
-        years.map((y) => <ArchiveCard key={y.year} y={y} />)
-      )}
-    </Screen>
+    <Body onRefresh={refresh} refreshing={refreshing}>
+      <Text style={styles.section}>Ваш путь в клинике</Text>
+      {years.length === 0 ? <Empty text="Здесь будет история ваших лет в профессии." /> : years.map((y) => (
+        <View key={y.year} style={styles.card}>
+          <View style={styles.rowBetween}>
+            <Text style={styles.yearNum}>{y.year}</Text>
+            {y.showPercentage && y.percentage != null
+              ? <View style={[styles.yearBadge, { backgroundColor: tint.green15 }]}><Text style={{ color: colors.greenDeep, fontSize: 12, fontWeight: "700" }}>Выполнено {y.percentage}%</Text></View>
+              : <View style={[styles.yearBadge, { backgroundColor: tint.plum10 }]}><Text style={{ color: colors.plum, fontSize: 12, fontWeight: "700" }}>Год в профессии</Text></View>}
+          </View>
+          {y.achievements.length > 0 ? y.achievements.map((a, i) => (
+            <View key={i} style={styles.achRow}><Ionicons name="checkmark-circle" size={15} color={colors.orange} /><Text style={styles.achText}>{a}</Text></View>
+          )) : <Text style={styles.muted12}>двигались вперёд в своём темпе.</Text>}
+          {!y.showPercentage ? <Text style={styles.warm}>🌱 {warmCopy.archiveLow}</Text> : null}
+        </View>
+      ))}
+      <View style={[styles.card, { backgroundColor: tint.plum08, alignItems: "center" }]}>
+        <Ionicons name="archive-outline" size={22} color={colors.muted} />
+        <Text style={[styles.muted12, { textAlign: "center", marginTop: 4 }]}>Архив хранит все ваши планы, колёса баланса и рефлексии за каждый год</Text>
+      </View>
+    </Body>
   );
 }
 
-function ArchiveCard({ y }: { y: ArchiveYear }) {
-  // §6.1: ≥60% → показываем процент; <60% → процент НЕ показываем,
-  // только тёплая подача и список достижений.
-  return (
-    <Card>
-      <View style={styles.rowBetween}>
-        <Text style={typography.h2}>{y.year}</Text>
-        {y.showPercentage && y.percentage != null ? (
-          <Badge text={`${y.percentage}%`} color={colors.green} />
-        ) : null}
-      </View>
-      <Text style={[typography.body, { fontWeight: "700" }]}>{y.mission}</Text>
-
-      {y.showPercentage ? (
-        <Text style={typography.muted}>Ваши достижения за год:</Text>
-      ) : (
-        <Text style={[typography.body, { color: colors.plum }]}>За {y.year} вы:</Text>
-      )}
-
-      {y.achievements.length > 0 ? (
-        y.achievements.map((a, i) => (
-          <View key={i} style={styles.achRow}>
-            <Ionicons name="star" size={15} color={colors.yellow} />
-            <Text style={[typography.body, { flex: 1 }]}>{a}</Text>
-          </View>
-        ))
-      ) : (
-        <Text style={typography.muted}>двигались вперёд в своём темпе.</Text>
-      )}
-
-      {!y.showPercentage ? <Text style={styles.warm}>{warmCopy.archiveLow}</Text> : null}
-    </Card>
-  );
+function plural(n: number, one: string, few: string, many: string) {
+  const d = n % 10, dd = n % 100;
+  if (d === 1 && dd !== 11) return one;
+  if (d >= 2 && d <= 4 && (dd < 10 || dd >= 20)) return few;
+  return many;
 }
 
 const styles = StyleSheet.create({
-  segmentWrap: {
-    flexDirection: "row", backgroundColor: "#ece5f3", borderRadius: radius.pill,
-    padding: 4, margin: space.lg, marginBottom: 0,
-  },
-  segment: { flex: 1, paddingVertical: space.sm, borderRadius: radius.pill, alignItems: "center" },
-  segmentActive: { backgroundColor: colors.white },
-  segmentText: { fontSize: 13, fontWeight: "600", color: colors.muted },
-  segmentTextActive: { color: colors.plum },
-  rowBetween: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", gap: space.sm },
-  taskRow: {
-    flexDirection: "row", alignItems: "center", gap: space.md,
-    paddingVertical: space.sm, borderTopWidth: 1, borderTopColor: "#f0ebf5",
-  },
+  header: { paddingHorizontal: space.lg, paddingTop: space.md, paddingBottom: space.md },
+  headerTop: { flexDirection: "row", justifyContent: "space-between", alignItems: "center" },
+  headerKicker: { color: colors.yellow, fontSize: 11, fontWeight: "700", textTransform: "uppercase", letterSpacing: 0.5 },
+  headerTitle: { color: colors.white, fontSize: 20, fontWeight: "800", marginVertical: space.sm },
+  segment: { flexDirection: "row", gap: 4, padding: 4, borderRadius: radius.md, backgroundColor: "rgba(255,255,255,0.15)" },
+  segBtn: { flex: 1, paddingVertical: 9, borderRadius: radius.sm, alignItems: "center" },
+  segBtnActive: { backgroundColor: colors.white },
+  segText: { fontSize: 13, fontWeight: "700" },
+  body: { padding: space.lg, paddingBottom: 90, gap: space.md },
+  card: { backgroundColor: colors.white, borderRadius: radius.md, padding: space.lg, borderWidth: 1, borderColor: colors.line, gap: 6 },
+  rowCenter: { flexDirection: "row", alignItems: "center", gap: space.md },
+  rowBetween: { flexDirection: "row", alignItems: "center", justifyContent: "space-between" },
+  pct: { color: colors.plum, fontWeight: "800", fontSize: 15 },
+  cap: { fontSize: 11, fontWeight: "700", color: colors.orange, textTransform: "uppercase", letterSpacing: 0.5 },
+  body15: { fontSize: 15, color: colors.ink, lineHeight: 21 },
+  muted12: { fontSize: 12, color: colors.muted },
+  link: { fontSize: 12, color: colors.plum, fontWeight: "700" },
+  wheelRow: { flexDirection: "row", alignItems: "center", justifyContent: "space-between" },
+  wheelLabel: { fontSize: 13, color: colors.ink, flex: 1 },
+  dual: { flexDirection: "row", alignItems: "center", gap: 2 },
+  stepBtn: { width: 26, height: 26, borderRadius: 8, borderWidth: 1, borderColor: colors.line, alignItems: "center", justifyContent: "center" },
+  stepVal: { width: 20, textAlign: "center", fontWeight: "800", fontSize: 13 },
+  rule: { flexDirection: "row", alignItems: "center", gap: space.md, borderRadius: radius.md, padding: space.lg, backgroundColor: tint.yellow18 },
+  ruleText: { flex: 1, fontSize: 14, color: colors.plumDeep, lineHeight: 20 },
+  section: { fontSize: 11, fontWeight: "700", color: colors.orange, textTransform: "uppercase", letterSpacing: 1, marginTop: space.xs },
+  qCard: { backgroundColor: colors.white, borderRadius: radius.md, borderWidth: 1, borderColor: colors.line, overflow: "hidden" },
+  qHead: { flexDirection: "row", alignItems: "center", gap: space.md, padding: space.lg },
+  qBadge: { width: 48, height: 48, borderRadius: radius.sm, alignItems: "center", justifyContent: "center" },
+  qBadgeText: { color: colors.white, fontWeight: "800", fontSize: 15 },
+  qTitle: { fontSize: 14, fontWeight: "700", color: colors.plumDeep },
+  qFocus: { fontSize: 12, color: colors.muted, fontStyle: "italic", marginTop: 2 },
+  taskRow: { flexDirection: "row", gap: space.md, paddingVertical: space.sm, borderTopWidth: 1, borderTopColor: colors.line, alignItems: "flex-start" },
+  tagWrap: { alignSelf: "flex-start", backgroundColor: tint.plum10, borderRadius: radius.pill, paddingHorizontal: 8, paddingVertical: 1, marginBottom: 3 },
+  tag: { fontSize: 10, color: colors.plum, fontWeight: "700" },
+  taskText: { fontSize: 14, color: colors.ink },
   taskDone: { textDecorationLine: "line-through", color: colors.muted },
-  stepperRow: { flexDirection: "row", alignItems: "center", gap: space.sm, paddingVertical: space.xs },
-  stepBtn: {
-    width: 34, height: 34, borderRadius: radius.sm, borderWidth: 1, borderColor: "#e0d8ea",
-    alignItems: "center", justifyContent: "center",
-  },
-  stepValue: { width: 26, textAlign: "center", fontWeight: "800", color: colors.ink, fontSize: 16 },
-  catRow: { flexDirection: "row", flexWrap: "wrap", gap: space.sm },
-  catChip: { paddingHorizontal: space.md, paddingVertical: space.xs, borderRadius: radius.pill, backgroundColor: "#ece5f3" },
-  catChipActive: { backgroundColor: colors.plum },
+  taskEmpty: { fontSize: 12, color: colors.muted, fontStyle: "italic", paddingTop: space.sm },
+  insight: { marginTop: space.sm, borderRadius: radius.sm, padding: space.md, backgroundColor: tint.yellow12 },
+  insightCap: { fontSize: 12, fontWeight: "700", color: colors.plum, marginBottom: 4 },
+  insightInput: { backgroundColor: colors.white, borderRadius: radius.sm, borderWidth: 1, borderColor: colors.line, padding: space.sm, fontSize: 13, color: colors.ink, textAlignVertical: "top", minHeight: 48 },
+  foot: { fontSize: 12, color: colors.muted, textAlign: "center" },
+  trophy: { borderRadius: radius.md, padding: space.lg, alignItems: "center", gap: 4 },
+  trophyNum: { color: colors.white, fontWeight: "800", fontSize: 18 },
+  trophySub: { color: colors.white, opacity: 0.9, fontSize: 12 },
+  addBtn: { flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 8, backgroundColor: colors.plum, borderRadius: radius.md, paddingVertical: 13 },
+  addBtnText: { color: colors.white, fontWeight: "700", fontSize: 15 },
+  catRow: { flexDirection: "row", flexWrap: "wrap", gap: space.sm, marginVertical: space.sm },
+  catChip: { paddingHorizontal: space.md, paddingVertical: 6, borderRadius: radius.pill, backgroundColor: tint.plum10 },
   catChipText: { fontSize: 13, fontWeight: "600", color: colors.muted },
-  catChipTextActive: { color: colors.white },
-  achRow: { flexDirection: "row", alignItems: "center", gap: space.xs },
-  warm: { ...typography.muted, fontStyle: "italic", color: colors.plum, marginTop: space.xs },
+  winCard: { flexDirection: "row", gap: space.md, backgroundColor: colors.white, borderRadius: radius.md, padding: space.lg, borderWidth: 1, borderColor: colors.line },
+  winBar: { width: 4, borderRadius: 2 },
+  catBadge: { alignSelf: "flex-start", borderRadius: radius.pill, paddingHorizontal: 8, paddingVertical: 2, marginBottom: 4 },
+  yearNum: { fontSize: 18, fontWeight: "800", color: colors.plumDeep },
+  yearBadge: { borderRadius: radius.pill, paddingHorizontal: 12, paddingVertical: 4 },
+  achRow: { flexDirection: "row", alignItems: "center", gap: space.sm, marginTop: 2 },
+  achText: { flex: 1, fontSize: 14, color: colors.ink },
+  warm: { fontSize: 12, color: colors.plumDeep, fontStyle: "italic", marginTop: space.sm, backgroundColor: tint.yellow12, padding: space.sm, borderRadius: radius.sm },
 });

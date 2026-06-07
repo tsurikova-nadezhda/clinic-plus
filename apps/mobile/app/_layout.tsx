@@ -25,16 +25,7 @@ function RootNavigator() {
     <Stack screenOptions={{ headerShown: false, contentStyle: { backgroundColor: colors.paper } }}>
       <Stack.Screen name="login" />
       <Stack.Screen name="(tabs)" />
-      <Stack.Screen
-        name="case/[id]"
-        options={{
-          headerShown: true,
-          title: "Случай из практики",
-          headerStyle: { backgroundColor: colors.plum },
-          headerTintColor: colors.white,
-          presentation: "card",
-        }}
-      />
+      <Stack.Screen name="case/[id]" options={{ headerShown: false, presentation: "card" }} />
     </Stack>
   );
 }
