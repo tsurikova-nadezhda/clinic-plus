@@ -52,7 +52,18 @@ import {
 // ─────────────────────────────────────────────
 const JWT_SECRET = process.env.JWT_SECRET
   ?? (() => { throw new Error("JWT_SECRET env variable is required"); })();
-const ALLOWED_ORIGINS = (process.env.ALLOWED_ORIGINS ?? "http://localhost:3000").split(",");
+const ALLOWED_ORIGINS = new Set(
+  (process.env.ALLOWED_ORIGINS ?? "http://localhost:3000").split(",").map((s) => s.trim()).filter(Boolean),
+);
+
+// Разрешаем: точные боевые домены из env + любой localhost/127.0.0.1 на любом порту
+// (удобно для dev: admin :5173, expo web :8081 и т.п.). SPEC §6.3 — allowlist.
+function corsOrigin(origin: string): string | null {
+  if (!origin) return null; // запросы без Origin (нативные) CORS не касается
+  if (ALLOWED_ORIGINS.has(origin)) return origin;
+  if (/^https?:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/.test(origin)) return origin;
+  return null;
+}
 const BCRYPT_ROUNDS = 12;
 const JWT_TTL = 60 * 60 * 24 * 7; // 7 дней (SPEC §6.3)
 
@@ -124,7 +135,7 @@ function newToken(userId: string, role: "doctor" | "admin") {
 // ─────────────────────────────────────────────
 export const app = new Hono();
 app.use("*", logger());
-app.use("*", cors({ origin: ALLOWED_ORIGINS, credentials: true }));
+app.use("*", cors({ origin: corsOrigin, credentials: true }));
 
 // Health-check (без авторизации) — для Railway/Render.
 app.get("/health", (c) => c.json({ ok: true, ts: new Date().toISOString() }));
