@@ -13,7 +13,9 @@
       "backgroundColor": "#523E7A",
       "resizeMode": "contain"
     },
-    "assetBundlePatterns": ["**/*"],
+    "assetBundlePatterns": [
+      "**/*"
+    ],
     "ios": {
       "supportsTablet": true,
       "bundleIdentifier": "ru.clinicplus.doctor"
@@ -41,7 +43,14 @@
       "typedRoutes": true
     },
     "extra": {
-      "apiUrl": "https://clinic-plus-api-production-f3d7.up.railway.app"
-    }
+      "apiUrl": "https://clinic-plus-api-production-f3d7.up.railway.app",
+      "router": {
+        "origin": false
+      },
+      "eas": {
+        "projectId": "2f87b552-e74e-401e-8c04-a4ec4668e774"
+      }
+    },
+    "owner": "tsurikova"
   }
 }
