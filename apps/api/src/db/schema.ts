@@ -180,6 +180,19 @@ export const sentReminders = pgTable("sent_reminders", {
   uniq: uniqueIndex("sent_reminders_activity_min_idx").on(t.activityId, t.minutesBefore),
 }));
 
+// ─────────────────────────────────────────────
+//  DAILY PUSH LOG — журнал плановых push (§ мотивация/рефлексия)
+//  Идемпотентность: один push вида kind на день dayKey.
+// ─────────────────────────────────────────────
+export const dailyPushLog = pgTable("daily_push_log", {
+  id:     text("id").primaryKey().$defaultFn(() => createId()),
+  kind:   text("kind").notNull(),     // "motivation" | "reflection"
+  dayKey: text("day_key").notNull(),  // YYYY-MM-DD (UTC)
+  sentAt: timestamp("sent_at").defaultNow(),
+}, (t) => ({
+  uniq: uniqueIndex("daily_push_kind_day_idx").on(t.kind, t.dayKey),
+}));
+
 export const caseSubmissions = pgTable("case_submissions", {
   id:          text("id").primaryKey().$defaultFn(() => createId()),
   userId:      text("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),

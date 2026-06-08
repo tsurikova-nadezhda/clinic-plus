@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { View, Text, StyleSheet, Pressable, TextInput } from "react-native";
+import { View, Text, StyleSheet, Pressable, TextInput, Linking } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { LinearGradient } from "expo-linear-gradient";
 import { SafeAreaView } from "react-native-safe-area-context";
@@ -96,6 +96,18 @@ function PlanTab() {
         <Text style={styles.cap}>Миссия года</Text>
         <Text style={styles.body15}>{plan.mission || "Миссия пока не задана руководителем."}</Text>
       </View>
+
+      {/* PDF индивидуального плана развития */}
+      {plan.pdfUrl ? (
+        <Pressable onPress={() => Linking.openURL(plan.pdfUrl!)} style={styles.pdfBtn}>
+          <Ionicons name="document-text" size={20} color={colors.plum} />
+          <View style={{ flex: 1 }}>
+            <Text style={styles.pdfTitle}>Полный план развития (PDF)</Text>
+            <Text style={styles.muted12}>Открыть подробный документ ИПР</Text>
+          </View>
+          <Ionicons name="open-outline" size={16} color={colors.muted} />
+        </Pressable>
+      ) : null}
 
       {/* колесо баланса */}
       <View style={styles.card}>
@@ -312,6 +324,8 @@ const styles = StyleSheet.create({
   body15: { fontSize: 15, color: colors.ink, lineHeight: 21 },
   muted12: { fontSize: 12, color: colors.muted },
   link: { fontSize: 12, color: colors.plum, fontWeight: "700" },
+  pdfBtn: { flexDirection: "row", alignItems: "center", gap: space.md, backgroundColor: colors.white, borderRadius: radius.md, padding: space.lg, borderWidth: 1, borderColor: colors.plum },
+  pdfTitle: { fontSize: 14, fontWeight: "700", color: colors.plumDeep },
   wheelRow: { flexDirection: "row", alignItems: "center", justifyContent: "space-between" },
   wheelLabel: { fontSize: 13, color: colors.ink, flex: 1 },
   dual: { flexDirection: "row", alignItems: "center", gap: 2 },

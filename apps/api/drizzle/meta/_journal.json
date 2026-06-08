@@ -15,6 +15,13 @@
       "when": 1780672990389,
       "tag": "0001_lonely_mentor",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1780908011104,
+      "tag": "0002_quick_wolf_cub",
+      "breakpoints": true
     }
   ]
 }

@@ -23,7 +23,7 @@ import { app } from "../src/app";
 import { db, initDb } from "../src/db";
 import * as schema from "../src/db/schema";
 import * as bcrypt from "bcryptjs";
-import { dispatchDueReminders } from "../src/lib/scheduler";
+import { dispatchDueReminders, dispatchDailyPush } from "../src/lib/scheduler";
 
 // ─────────────────────────────────────────────
 //  HELPERS
@@ -592,6 +592,29 @@ describe("Push reminder scheduler", () => {
     // ни одно из напоминаний далёкого события не созрело
     expect(sendCalls).toBe(0);
     expect(before).toBe(0);
+  });
+});
+
+// ─────────────────────────────────────────────
+//  DAILY PUSH (мотивация / рефлексия)
+// ─────────────────────────────────────────────
+describe("Scheduled daily push", () => {
+  it("sends reflection+motivation on the 25th once (dedup)", async () => {
+    const now = new Date("2026-06-25T06:00:00Z"); // 25 число, окно отправки
+    let calls = 0;
+    const fake = async () => { calls++; };
+    const first = await dispatchDailyPush(now, fake);
+    const second = await dispatchDailyPush(now, fake);
+    expect(first).toBeGreaterThan(0);
+    expect(second).toBe(0);
+    expect(calls).toBeGreaterThan(0);
+  });
+
+  it("does nothing outside the push hour", async () => {
+    let calls = 0;
+    const r = await dispatchDailyPush(new Date("2026-06-10T12:00:00Z"), async () => { calls++; });
+    expect(r).toBe(0);
+    expect(calls).toBe(0);
   });
 });
 

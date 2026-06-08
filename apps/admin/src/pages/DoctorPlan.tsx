@@ -28,7 +28,7 @@ export function DoctorPlan() {
       setLoading(true);
       try {
         const p = await api.getPlan(userId);
-        setPlan({ year: p.year, mission: p.mission, quarters: p.quarters ?? [], achievements: p.achievements });
+        setPlan({ year: p.year, mission: p.mission, quarters: p.quarters ?? [], achievements: p.achievements, pdfUrl: p.pdfUrl ?? "" });
       } catch (e) {
         if (e instanceof ApiError && e.status === 404) setPlan(emptyPlan());
         else setMsg({ kind: "err", text: e instanceof Error ? e.message : "Ошибка" });
@@ -107,6 +107,7 @@ export function DoctorPlan() {
           </div>
         </div>
         <Field label="Миссия года" value={plan.mission} onChange={(v) => update({ mission: v })} textarea rows={2} placeholder="Стать экспертом в…" />
+        <Field label="Ссылка на PDF плана развития (ИПР)" value={plan.pdfUrl ?? ""} onChange={(v) => update({ pdfUrl: v })} placeholder="https://… (Google Drive, Supabase Storage, сайт клиники)" />
       </Card>
 
       {showJson && (

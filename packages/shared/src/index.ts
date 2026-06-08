@@ -48,6 +48,8 @@ export const planSchema = z.object({
   year: z.number().int().min(2024).max(2040),
   mission: z.string().min(5),
   achievements: z.array(z.string()).optional(),
+  /** Ссылка на PDF-версию индивидуального плана развития (ИПР). */
+  pdfUrl: z.string().url().optional().or(z.literal("")),
   quarters: z.array(planQuarterSchema),
 });
 export type Plan = z.infer<typeof planSchema>;
