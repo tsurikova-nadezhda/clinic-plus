@@ -8,6 +8,7 @@ import { Activities } from "./pages/Activities";
 import { News } from "./pages/News";
 import { Cases } from "./pages/Cases";
 import { Stats } from "./pages/Stats";
+import { Security } from "./pages/Security";
 
 function Routed() {
   const { user, loading } = useAuth();
@@ -23,6 +24,7 @@ function Routed() {
         <Route path="/news" element={<News />} />
         <Route path="/cases" element={<Cases />} />
         <Route path="/stats" element={<Stats />} />
+        <Route path="/security" element={<Security />} />
         <Route path="*" element={<Navigate to="/doctors" replace />} />
       </Route>
     </Routes>

@@ -8,6 +8,7 @@ const NAV = [
   { to: "/news", label: "Новости", icon: "📰" },
   { to: "/cases", label: "Клинические задачи", icon: "🩺" },
   { to: "/stats", label: "Статистика", icon: "📊" },
+  { to: "/security", label: "Безопасность", icon: "🔒" },
 ];
 
 export function Layout() {

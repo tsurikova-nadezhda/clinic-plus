@@ -113,6 +113,13 @@ const loginSchema = z.object({
   password: z.string().min(1),
 });
 
+const passwordChangeSchema = z.object({
+  currentPassword: z.string().min(1),
+  newPassword: z.string()
+    .min(8, "password must be at least 8 characters")
+    .regex(/\d/, "password must contain a digit"),
+});
+
 // Активность: к доменной схеме добавляем правило «дата начала в будущем»
 const activitySchema = activityInputSchema.refine(
   (d) => new Date(d.startsAt) > new Date(),
@@ -189,6 +196,18 @@ app.post("/auth/login", zv("json", loginSchema), async (c) => {
 
   const token = await newToken(user.id, user.role, user.name);
   return c.json({ token });
+});
+
+// Смена собственного пароля (любой авторизованный пользователь).
+app.patch("/auth/password", authMiddleware, zv("json", passwordChangeSchema), async (c) => {
+  const { sub } = c.get("jwtPayload") as JWTPayload;
+  const { currentPassword, newPassword } = c.req.valid("json");
+  const user = await db.query.users.findFirst({ where: eq(schema.users.id, sub) });
+  if (!user || !(await bcrypt.compare(currentPassword, user.passwordHash)))
+    return c.json({ error: "Текущий пароль неверный" }, 401);
+  const hash = await bcrypt.hash(newPassword, BCRYPT_ROUNDS);
+  await db.update(schema.users).set({ passwordHash: hash }).where(eq(schema.users.id, sub));
+  return c.json({ message: "Пароль изменён" });
 });
 
 // ─────────────────────────────────────────────

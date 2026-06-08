@@ -596,6 +596,31 @@ describe("Push reminder scheduler", () => {
 });
 
 // ─────────────────────────────────────────────
+//  СМЕНА ПАРОЛЯ
+// ─────────────────────────────────────────────
+describe("PATCH /auth/password", () => {
+  it("changes own password with correct current password", async () => {
+    const reg = await req("/auth/register", { method: "POST", body: { email: "pwtest@clinic.ru", password: "OldPass1", name: "PW Test" } });
+    const tok = reg.body.token as string;
+
+    const bad = await req("/auth/password", { method: "PATCH", token: tok, body: { currentPassword: "WRONGPASS", newPassword: "NewPass2" } });
+    expect(bad.status).toBe(401);
+
+    const ok = await req("/auth/password", { method: "PATCH", token: tok, body: { currentPassword: "OldPass1", newPassword: "NewPass2" } });
+    expect(ok.status).toBe(200);
+
+    const login = await req("/auth/login", { method: "POST", body: { email: "pwtest@clinic.ru", password: "NewPass2" } });
+    expect(login.status).toBe(200);
+  });
+
+  it("rejects weak new password", async () => {
+    const reg = await req("/auth/register", { method: "POST", body: { email: "pwtest2@clinic.ru", password: "OldPass1", name: "PW Test 2" } });
+    const r = await req("/auth/password", { method: "PATCH", token: reg.body.token, body: { currentPassword: "OldPass1", newPassword: "short" } });
+    expect(r.status).toBe(400);
+  });
+});
+
+// ─────────────────────────────────────────────
 //  PDF UPLOAD (admin)
 // ─────────────────────────────────────────────
 describe("POST /plans/:userId/pdf", () => {

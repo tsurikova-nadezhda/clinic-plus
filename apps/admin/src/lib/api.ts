@@ -56,6 +56,8 @@ export const api = {
   setToken: setApiToken,
   login: (email: string, password: string) =>
     request<{ token: string }>("/auth/login", { method: "POST", body: { email, password }, auth: false }),
+  changePassword: (currentPassword: string, newPassword: string) =>
+    request<{ message: string }>("/auth/password", { method: "PATCH", body: { currentPassword, newPassword } }),
 
   // врачи / планы
   doctors: () => request<{ items: DoctorRow[] }>("/admin/doctors"),
