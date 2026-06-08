@@ -22,6 +22,20 @@ export function DoctorPlan() {
   const [jsonText, setJsonText] = useState("");
   const [msg, setMsg] = useState<{ kind: "ok" | "err"; text: string } | null>(null);
   const [saving, setSaving] = useState(false);
+  const [pdfMsg, setPdfMsg] = useState<string | null>(null);
+
+  async function handlePdf(e: React.ChangeEvent<HTMLInputElement>) {
+    const f = e.target.files?.[0];
+    if (!f) return;
+    setPdfMsg("Загрузка…");
+    try {
+      const r = await api.uploadPlanPdf(userId, f);
+      setPlan((prev) => (prev ? { ...prev, pdfUrl: r.pdfUrl } : prev));
+      setPdfMsg("Загружено ✓ — нажмите «Загрузить план врачу», чтобы сохранить.");
+    } catch (err) {
+      setPdfMsg(err instanceof Error ? err.message : "Ошибка загрузки");
+    }
+  }
 
   useEffect(() => {
     (async () => {
@@ -107,7 +121,12 @@ export function DoctorPlan() {
           </div>
         </div>
         <Field label="Миссия года" value={plan.mission} onChange={(v) => update({ mission: v })} textarea rows={2} placeholder="Стать экспертом в…" />
-        <Field label="Ссылка на PDF плана развития (ИПР)" value={plan.pdfUrl ?? ""} onChange={(v) => update({ pdfUrl: v })} placeholder="https://… (Google Drive, Supabase Storage, сайт клиники)" />
+        <Field label="Ссылка на PDF плана развития (ИПР)" value={plan.pdfUrl ?? ""} onChange={(v) => update({ pdfUrl: v })} placeholder="https://… или загрузите файл ниже" />
+        <div className="field">
+          <label>Или загрузить PDF-файл (хранится в Supabase Storage)</label>
+          <input type="file" accept="application/pdf" onChange={handlePdf} />
+          {pdfMsg ? <p className="muted" style={{ marginTop: 6 }}>{pdfMsg}</p> : null}
+        </div>
       </Card>
 
       {showJson && (

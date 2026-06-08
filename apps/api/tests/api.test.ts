@@ -596,6 +596,21 @@ describe("Push reminder scheduler", () => {
 });
 
 // ─────────────────────────────────────────────
+//  PDF UPLOAD (admin)
+// ─────────────────────────────────────────────
+describe("POST /plans/:userId/pdf", () => {
+  it("doctor cannot upload a plan PDF", async () => {
+    const r = await req("/plans/anyuser/pdf", { method: "POST", token: doctorToken });
+    expect(r.status).toBe(403);
+  });
+
+  it("admin upload returns 503 when storage env is not configured", async () => {
+    const r = await req("/plans/anyuser/pdf", { method: "POST", token: adminToken });
+    expect(r.status).toBe(503);
+  });
+});
+
+// ─────────────────────────────────────────────
 //  DAILY PUSH (мотивация / рефлексия)
 // ─────────────────────────────────────────────
 describe("Scheduled daily push", () => {

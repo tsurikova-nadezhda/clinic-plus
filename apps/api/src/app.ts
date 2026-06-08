@@ -194,6 +194,11 @@ app.post("/auth/login", zv("json", loginSchema), async (c) => {
 // ─────────────────────────────────────────────
 //  PLANS
 // ─────────────────────────────────────────────
+// Supabase Storage для PDF-планов (опционально; включается заданием env).
+const SUPABASE_URL = process.env.SUPABASE_URL?.replace(/\/$/, "");
+const SUPABASE_SERVICE_KEY = process.env.SUPABASE_SERVICE_KEY;
+const PDF_BUCKET = process.env.SUPABASE_PDF_BUCKET ?? "plans";
+
 const planRoutes = new Hono();
 planRoutes.use("*", authMiddleware);
 
@@ -248,6 +253,46 @@ planRoutes.put("/:userId", requireAdmin, zv("json", planSchema), async (c) => {
       set: { data: sanitised, updatedAt: new Date() },
     });
   return c.json({ message: "Plan updated" });
+});
+
+// Загрузка PDF-плана (ИПР) в Supabase Storage; админ. Возвращает публичный URL
+// и привязывает к плану текущего года, если он уже создан.
+planRoutes.post("/:userId/pdf", requireAdmin, async (c) => {
+  if (!SUPABASE_URL || !SUPABASE_SERVICE_KEY) {
+    return c.json({ error: "Хранилище PDF не настроено (SUPABASE_URL / SUPABASE_SERVICE_KEY)" }, 503);
+  }
+  const { userId } = c.req.param();
+  const form = await c.req.parseBody();
+  const file = form["file"];
+  if (!(file instanceof File)) return c.json({ error: "Нужен файл в поле file" }, 400);
+  if (file.type && file.type !== "application/pdf") return c.json({ error: "Только PDF" }, 400);
+  if (file.size > 10 * 1024 * 1024) return c.json({ error: "Файл больше 10 МБ" }, 413);
+
+  const path = `${userId}/plan-${Date.now()}.pdf`;
+  const up = await fetch(`${SUPABASE_URL}/storage/v1/object/${PDF_BUCKET}/${path}`, {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${SUPABASE_SERVICE_KEY}`,
+      "Content-Type": "application/pdf",
+      "x-upsert": "true",
+    },
+    body: await file.arrayBuffer(),
+  });
+  if (!up.ok) return c.json({ error: "Ошибка хранилища: " + (await up.text()).slice(0, 200) }, 502);
+
+  const pdfUrl = `${SUPABASE_URL}/storage/v1/object/public/${PDF_BUCKET}/${path}`;
+
+  // Привязать к плану текущего года, если он уже есть.
+  const year = new Date().getFullYear();
+  const existing = await db.query.plans.findFirst({
+    where: and(eq(schema.plans.userId, userId), eq(schema.plans.year, year)),
+  });
+  if (existing) {
+    await db.update(schema.plans)
+      .set({ data: { ...(existing.data as any), pdfUrl }, updatedAt: new Date() })
+      .where(and(eq(schema.plans.userId, userId), eq(schema.plans.year, year)));
+  }
+  return c.json({ pdfUrl });
 });
 
 planRoutes.patch("/me/tasks/:taskId", zv("json", taskStatusSchema), async (c) => {

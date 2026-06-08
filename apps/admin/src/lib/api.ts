@@ -62,6 +62,18 @@ export const api = {
   getPlan: (userId: string) => request<Plan>(`/plans/${userId}`),
   putPlan: (userId: string, plan: Plan) =>
     request<{ message: string }>(`/plans/${userId}`, { method: "PUT", body: plan }),
+  uploadPlanPdf: async (userId: string, file: File): Promise<{ pdfUrl: string }> => {
+    const fd = new FormData();
+    fd.append("file", file);
+    const res = await fetch(`${BASE}/plans/${userId}/pdf`, {
+      method: "POST",
+      headers: token ? { Authorization: `Bearer ${token}` } : {},
+      body: fd,
+    });
+    const json = await res.json().catch(() => null);
+    if (!res.ok) throw new ApiError(res.status, (json && json.error) || `HTTP ${res.status}`);
+    return json;
+  },
 
   // мероприятия / новости / кейсы
   activities: () => request<{ items: ActivityRow[] }>("/activities"),
