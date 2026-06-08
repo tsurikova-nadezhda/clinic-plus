@@ -62,6 +62,7 @@ function corsOrigin(origin: string): string | null {
   if (!origin) return null; // запросы без Origin (нативные) CORS не касается
   if (ALLOWED_ORIGINS.has(origin)) return origin;
   if (/^https?:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/.test(origin)) return origin;
+  if (/^https:\/\/[a-z0-9-]+\.netlify\.app$/.test(origin)) return origin; // деплои на Netlify
   return null;
 }
 const BCRYPT_ROUNDS = 12;
