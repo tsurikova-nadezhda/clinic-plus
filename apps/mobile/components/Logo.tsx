@@ -1,51 +1,15 @@
-import { View, Text, StyleSheet } from "react-native";
-import { colors } from "../lib/theme";
+import { Image } from "react-native";
+
+// Настоящий логотип клиники (детская клиника ПЛЮС), соотношение 338:86.
+const LOGO = require("../assets/logo.png");
+const RATIO = 338 / 86;
 
 /**
- * Логотип «детская клиника ПЛЮС» (SPEC §4).
- * Оригинальный знак: скруглённый бейдж с медицинским крестом (вместо
- * некорректного инлайн-«+»). Слово ПЛЮС — фирменные цвета букв:
- * П green, Л yellow, Ю orange, С blue.
- * Официальный логотип клиники можно позже подставить картинкой.
+ * Логотип «детская клиника ПЛЮС» — реальный фирменный знак (SPEC §4).
+ * size задаёт высоту; ширина считается по пропорции.
  */
-export function Logo({
-  size = 30,
-  compact = false,
-  onPlum = false,
-}: { size?: number; compact?: boolean; onPlum?: boolean }) {
-  const badge = Math.round(size * 1.15);
-  const barLen = Math.round(badge * 0.5);
-  const barThick = Math.max(3, Math.round(badge * 0.16));
-  return (
-    <View style={styles.row}>
-      <View style={[styles.badge, { width: badge, height: badge, borderRadius: badge * 0.32 }]}>
-        {/* медицинский крест из двух скруглённых полос */}
-        <View style={{ position: "absolute", width: barLen, height: barThick, borderRadius: barThick, backgroundColor: colors.white }} />
-        <View style={{ position: "absolute", width: barThick, height: barLen, borderRadius: barThick, backgroundColor: colors.white }} />
-      </View>
-      <View>
-        {!compact && (
-          <Text style={[styles.kicker, { color: onPlum ? colors.yellow : colors.plum }]}>
-            детская клиника
-          </Text>
-        )}
-        <View style={styles.word}>
-          {([["П", colors.green], ["Л", colors.yellow], ["Ю", colors.orange], ["С", colors.blue]] as const).map(
-            ([ch, col], i) => (
-              <Text key={i} style={{ color: col, fontSize: size, fontWeight: "900", letterSpacing: 0.5 }}>
-                {ch}
-              </Text>
-            ),
-          )}
-        </View>
-      </View>
-    </View>
-  );
+export function Logo({ size = 30 }: { size?: number; compact?: boolean; onPlum?: boolean }) {
+  const h = Math.round(size * 1.25);
+  const w = Math.round(h * RATIO);
+  return <Image source={LOGO} style={{ width: w, height: h }} resizeMode="contain" />;
 }
-
-const styles = StyleSheet.create({
-  row: { flexDirection: "row", alignItems: "center", gap: 8 },
-  badge: { backgroundColor: colors.plum, alignItems: "center", justifyContent: "center" },
-  kicker: { fontSize: 10, fontWeight: "700", textTransform: "lowercase", letterSpacing: 0.3, marginBottom: 1 },
-  word: { flexDirection: "row", alignItems: "center" },
-});
