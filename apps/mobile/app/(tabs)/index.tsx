@@ -3,7 +3,7 @@ import { View, Text, StyleSheet, Pressable } from "react-native";
 import { useRouter } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
 import { LinearGradient } from "expo-linear-gradient";
-import { Screen, Progress, Loading } from "../../components/ui";
+import { Screen, Progress, Loading, Empty } from "../../components/ui";
 import { Logo } from "../../components/Logo";
 import { api, type Activity, type NewsItem, type ClinicalCase } from "../../lib/api";
 import type { Plan } from "@clinic-plus/shared";
@@ -38,7 +38,7 @@ export default function HomeScreen() {
   const router = useRouter();
   const { user } = useAuth();
   const [banner, setBanner] = useState(false);
-  const { data, loading, refreshing, refresh } = useAsync<Dash>(async () => {
+  const { data, loading, error, refreshing, refresh } = useAsync<Dash>(async () => {
     const nowIso = new Date().toISOString();
     const [plan, acts, news, cases] = await Promise.all([
       api.planMe(), api.activities(nowIso), api.news(1, 1), api.cases(),
@@ -47,7 +47,8 @@ export default function HomeScreen() {
     return { plan, next: upcoming[0] ?? null, newsTotal: news.total, firstCase: cases.items[0] ?? null };
   });
 
-  if (loading || !data) return <Loading />;
+  if (loading) return <Loading />;
+  if (!data) return <Screen onRefresh={refresh} refreshing={refreshing}><Empty text={error ? `Ошибка загрузки: ${error}` : "Не удалось загрузить данные. Потяните вниз, чтобы обновить."} /></Screen>;
   const prog = planProgress(data.plan);
   const q = currentQuarter(data.plan);
 

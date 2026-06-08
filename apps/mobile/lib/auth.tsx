@@ -5,7 +5,7 @@
  */
 import { createContext, useContext, useEffect, useState, type ReactNode } from "react";
 import AsyncStorage from "@react-native-async-storage/async-storage";
-import { api } from "./api";
+import { api, setUnauthorizedHandler } from "./api";
 
 const TOKEN_KEY = "clinicplus.token";
 
@@ -53,6 +53,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }
 
   useEffect(() => {
+    // При 401 (просроченный/битый токен) — чистим сессию → редирект на вход.
+    setUnauthorizedHandler(() => {
+      AsyncStorage.removeItem(TOKEN_KEY);
+      apply(null);
+    });
     (async () => {
       const stored = await AsyncStorage.getItem(TOKEN_KEY);
       if (stored) apply(stored);

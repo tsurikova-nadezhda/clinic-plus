@@ -599,20 +599,38 @@ describe("Push reminder scheduler", () => {
 //  DAILY PUSH (мотивация / рефлексия)
 // ─────────────────────────────────────────────
 describe("Scheduled daily push", () => {
-  it("sends reflection+motivation on the 25th once (dedup)", async () => {
-    const now = new Date("2026-06-25T06:00:00Z"); // 25 число, окно отправки
+  it("sends motivation on the 2nd of month once (dedup)", async () => {
+    const now = new Date("2026-07-02T06:00:00Z"); // 2 число, окно отправки
     let calls = 0;
     const fake = async () => { calls++; };
     const first = await dispatchDailyPush(now, fake);
     const second = await dispatchDailyPush(now, fake);
-    expect(first).toBeGreaterThan(0);
+    expect(first).toBe(1);
     expect(second).toBe(0);
-    expect(calls).toBeGreaterThan(0);
+    expect(calls).toBe(1);
+  });
+
+  it("sends reflection on the 25th once (dedup)", async () => {
+    const now = new Date("2026-07-25T06:00:00Z");
+    let calls = 0;
+    const fake = async () => { calls++; };
+    const first = await dispatchDailyPush(now, fake);
+    const second = await dispatchDailyPush(now, fake);
+    expect(first).toBe(1);
+    expect(second).toBe(0);
+    expect(calls).toBe(1);
+  });
+
+  it("does nothing on an ordinary day", async () => {
+    let calls = 0;
+    const r = await dispatchDailyPush(new Date("2026-07-10T06:00:00Z"), async () => { calls++; });
+    expect(r).toBe(0);
+    expect(calls).toBe(0);
   });
 
   it("does nothing outside the push hour", async () => {
     let calls = 0;
-    const r = await dispatchDailyPush(new Date("2026-06-10T12:00:00Z"), async () => { calls++; });
+    const r = await dispatchDailyPush(new Date("2026-07-02T12:00:00Z"), async () => { calls++; });
     expect(r).toBe(0);
     expect(calls).toBe(0);
   });

@@ -5,6 +5,7 @@ import {
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { LinearGradient } from "expo-linear-gradient";
+import { ErrorBoundary } from "./ErrorBoundary";
 import { colors, gradients, horiz, radius, space } from "../lib/theme";
 
 /** Обёртка экрана: цветная безопасная зона сверху + прокручиваемый контент. */
@@ -19,7 +20,7 @@ export function Screen({
         showsVerticalScrollIndicator={false}
         refreshControl={onRefresh ? <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={colors.plum} /> : undefined}
       >
-        {children}
+        <ErrorBoundary>{children}</ErrorBoundary>
       </ScrollView>
     </View>
   );

@@ -88,11 +88,6 @@ const MOTIVATION = [
 const REFLECTION_MSG =
   "Конец месяца — время рефлексии. Откройте «Мой путь» и запишите свои инсайты и достижения за месяц ✍️";
 
-function dayOfYear(d: Date): number {
-  const start = Date.UTC(d.getUTCFullYear(), 0, 0);
-  return Math.floor((Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate()) - start) / 86_400_000);
-}
-
 async function sendOnce(kind: string, dayKey: string, title: string, body: string, tokens: any[], send: SendFn): Promise<boolean> {
   const exists = await db.query.dailyPushLog.findFirst({
     where: and(eq(schema.dailyPushLog.kind, kind), eq(schema.dailyPushLog.dayKey, dayKey)),
@@ -114,9 +109,9 @@ export async function dispatchDailyPush(now: Date = new Date(), send: SendFn = s
   const dayKey = now.toISOString().slice(0, 10);
   const tokens = await db.query.deviceTokens.findMany();
   let sent = 0;
-  // мотивация — по чётным дням года (≈ раз в 2 дня)
-  if (dayOfYear(now) % 2 === 0) {
-    const msg = MOTIVATION[dayOfYear(now) % MOTIVATION.length];
+  // мотивация — 2 числа каждого месяца
+  if (now.getUTCDate() === 2) {
+    const msg = MOTIVATION[now.getUTCMonth() % MOTIVATION.length];
     if (await sendOnce("motivation", dayKey, "Клиника ПЛЮС", msg, tokens as any[], send)) sent++;
   }
   // рефлексия — 25 числа каждого месяца

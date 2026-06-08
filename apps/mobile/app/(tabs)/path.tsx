@@ -6,6 +6,7 @@ import { SafeAreaView } from "react-native-safe-area-context";
 import { ScrollView, RefreshControl } from "react-native";
 import { Progress, Loading, Empty, Field, Button } from "../../components/ui";
 import { BalanceWheel } from "../../components/BalanceWheel";
+import { ErrorBoundary } from "../../components/ErrorBoundary";
 import { api, type Win } from "../../lib/api";
 import type { Plan, Task, Quarter, ArchiveYear } from "@clinic-plus/shared";
 import { useAuth } from "../../lib/auth";
@@ -48,7 +49,7 @@ function Body({ children, onRefresh, refreshing }: { children: React.ReactNode; 
   return (
     <ScrollView contentContainerStyle={styles.body} showsVerticalScrollIndicator={false}
       refreshControl={onRefresh ? <RefreshControl refreshing={!!refreshing} onRefresh={onRefresh} tintColor={colors.plum} /> : undefined}>
-      {children}
+      <ErrorBoundary>{children}</ErrorBoundary>
     </ScrollView>
   );
 }
@@ -65,13 +66,14 @@ function StatusIcon({ s }: { s: Task["status"] }) {
 }
 
 function PlanTab() {
-  const { data: plan, loading, refreshing, refresh, setData } = useAsync<Plan>(() => api.planMe());
+  const { data: plan, loading, error, refreshing, refresh, setData } = useAsync<Plan>(() => api.planMe());
   const [openQ, setOpenQ] = useState(0);
   const [start, setStart] = useState([7, 6, 7, 8, 5, 5, 7, 8]);
   const [end, setEnd] = useState([8, 8, 8, 9, 7, 7, 8, 9]);
   const [editWheel, setEditWheel] = useState(false);
 
-  if (loading || !plan) return <Body><Loading /></Body>;
+  if (loading) return <Body><Loading /></Body>;
+  if (!plan) return <Body onRefresh={refresh} refreshing={refreshing}><Empty text={error ? `Ошибка загрузки: ${error}` : "Не удалось загрузить план."} /></Body>;
   const prog = planProgress(plan);
   const quarters = plan.quarters ?? [];
 

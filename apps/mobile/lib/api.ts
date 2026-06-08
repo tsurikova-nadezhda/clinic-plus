@@ -24,6 +24,12 @@ export function setApiToken(t: string | null) {
   authToken = t;
 }
 
+// Колбэк при 401 (недействительный/просроченный токен) → разлогин в auth.tsx.
+let onUnauthorized: (() => void) | null = null;
+export function setUnauthorizedHandler(fn: () => void) {
+  onUnauthorized = fn;
+}
+
 async function request<T>(
   path: string,
   opts: { method?: string; body?: unknown; auth?: boolean } = {},
@@ -37,6 +43,9 @@ async function request<T>(
     body: opts.body !== undefined ? JSON.stringify(opts.body) : undefined,
   });
   const json = await res.json().catch(() => null);
+  if (res.status === 401 && opts.auth !== false) {
+    onUnauthorized?.(); // токен недействителен → разлогин и редирект на вход
+  }
   if (!res.ok) {
     throw new ApiError(res.status, (json && json.error) || `HTTP ${res.status}`);
   }
