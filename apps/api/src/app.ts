@@ -273,6 +273,7 @@ planRoutes.post("/:userId/pdf", requireAdmin, async (c) => {
     method: "POST",
     headers: {
       Authorization: `Bearer ${SUPABASE_SERVICE_KEY}`,
+      apikey: SUPABASE_SERVICE_KEY, // Supabase Storage требует и apikey (новые ключи)
       "Content-Type": "application/pdf",
       "x-upsert": "true",
     },
